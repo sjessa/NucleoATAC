@@ -30,7 +30,7 @@ pip install --editable .
 
 ### Updates to functionality
 
-### Allowing fragments files as input
+#### Allowing fragments files as input
 - Goal: allow nucleosome calling to be performed with tabix-indexed compressed fragments files in BED format
 - The `pyatac.fragmentsizes` module has been updated so that the `FragmentSizes` class
   can now accept a fragments file instead of a BAM file for calculation of the fragment
@@ -44,7 +44,7 @@ pip install --editable .
   using `pysam`'s tabix interface, and then populate the 2D matrix
 
 
-### Restrict analysis to chromosomes of interest
+#### Restrict analysis to chromosomes of interest
 - Goal: calculate the fragment size distribution on the whole dataset, but restrict
   the occupancy calculation to a subset of chromosomes to allow users to debug
   or further parallelize the analysis
@@ -53,9 +53,31 @@ pip install --editable .
   list will only be generated for these chromosomes.
 
 
-### Misc
+#### Misc
 - `nucleoatac occ` and `pyatac sizes` changed to produce .pdf instead of .eps files
 
+
+
+### Timing
+
+For reference, running only on chr1 (with 7,267,633 fragments) on 16 cores and 64G of memory took about 14 minutes.
+
+```
+Command run:  /path/to/.local/bin/nucleoatac occ --fragments ../data/Eye_c11__sorted.tsv.gz --bed ../data/Eye_c11__peaks_overlap_filtered.narrowPeak --fasta
+ /path/to/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta --out ../out/04-Eye_c11__chr1 --cores 4 --chroms_keep chr
+1
+nucleoatac version 0.3.4
+start run at: 2024-08-27 14:48
+---------Computing Occupancy and Nucleosomal Insert Distribution----------------
+@ NOTE: restricting analysis to chromosomes: chr1
+@ calculating fragment sizes...
+@ fitting fragment size distribution...
+@ calculating occupancy...
+@ compressing and indexing output files...
+@ making figure
+@ done.
+end run at: 2024-08-27 15:02
+```
 
 
 ## Previously
