@@ -14,6 +14,8 @@ for the last stable version.
 1. Create a conda environment
 
 ```bash
+# loading the module first seems to be necessary for properly loading cython
+module load python/2.7.13
 conda create -n "nucleoatac" python=2.7.13
 conda activate nucleoatac
 ```
@@ -28,10 +30,31 @@ pip install --editable .
 
 ### Updates to functionality
 
-- The `pyatac sizes` command now can now accept a fragments file instead of BAM file
+### Allowing fragments files as input
+- Goal: allow nucleosome calling to be performed with tabix-indexed compressed fragments files in BED format
 - The `pyatac.fragmentsizes` module has been updated so that the `FragmentSizes` class
   can now accept a fragments file instead of a BAM file for calculation of the fragment
   size distribution. This makes use of new functions in the `nucleoatac.fragments_handling` module.
+- The following commands now can now accept a fragments file instead of BAM file:
+  - `pyatac sizes`
+  - `nucleoatac occ` 
+- The `pyatac.chunkmat2d.FragmentMat2D` module has been updated so that the `FragmentMat2D` class
+  can now accept a fragments file instead of a BAM file for calculation of the fragment
+  size distribution, which will fetch the chunk region from the fragments file
+  using `pysam`'s tabix interface, and then populate the 2D matrix
+
+
+### Restrict analysis to chromosomes of interest
+- Goal: calculate the fragment size distribution on the whole dataset, but restrict
+  the occupancy calculation to a subset of chromosomes to allow users to debug
+  or further parallelize the analysis
+- The `nucleotac occ` command now accepts a `--chroms_keep` argument that allows users
+  to specify a list of chromosomes to restrict the occupancy calculation to, and a chunk
+  list will only be generated for these chromosomes.
+
+
+### Misc
+- `nucleoatac occ` and `pyatac sizes` changed to produce .pdf instead of .eps files
 
 
 
@@ -55,4 +78,4 @@ Documentation  can be found at http://nucleoatac.readthedocs.org/en/latest/
 
 If you want to easily read in NucleoATAC outputs into R for further processing or exploration, check out [NucleoATACR](https://github.com/GreenleafLab/NucleoATACR/)
 
-Currently NucleoATAC only supports Python 2.7 (No Python 3). If anyone is interested in adding Python 3 support, pull requests welcome :smile:
+Currently NucleoATAC only supports Python 2.7 (No Python 3).

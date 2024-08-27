@@ -15,7 +15,7 @@ class NoTestCommand(TestCommand):
 
 
 setup(name='NucleoATAC',
-    version='0.3.4',
+    version='0.4.0',
     description='python package for calling nucleosomes with ATAC-Seq',
     classifiers=[
         'Development Status :: 3 - Alpha',

@@ -1,7 +1,7 @@
 """
 Script to get fragment size distribution
 
-@author: Alicia Schep
+@author: Alicia Schep. Updated by Selin Jessa.
 """
 
 ##### IMPORT MODULES #####
@@ -44,6 +44,6 @@ def get_sizes(args):
         plt.plot(range(sizes.lower,sizes.upper),sizes.get(sizes.lower,sizes.upper),label = args.out)
         plt.xlabel("Fragment Size")
         plt.ylabel("Frequency")
-        fig.savefig(args.out+'.fragmentsizes.eps')
+        fig.savefig(args.out+'.fragmentsizes.pdf')
         plt.close(fig)
 

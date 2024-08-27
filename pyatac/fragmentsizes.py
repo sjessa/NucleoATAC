@@ -1,7 +1,8 @@
 """
 Classes for working with fragment distribution
 
-@author: Alicia Schep, Greenleaf Lab, Stanford University
+@author: Alicia Schep, Greenleaf Lab, Stanford University. Updated by Selin Jessa,
+Greenleaf Lab, Stanford University.
 """
 
 import numpy as np

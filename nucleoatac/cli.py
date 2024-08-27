@@ -32,8 +32,12 @@ def nucleoatac_main(args):
         print('---------Calling NFR positions--------------------------------------------------')
         run_nfr(args)
     elif call == "run":
-        occ_args = parser.parse_args(map(str,['occ','--bed',args.bed,'--bam',args.bam,
+        # modified to take fragments file as input instead of BAM
+        occ_args = parser.parse_args(map(str,['occ','--bed',args.bed,
+                                            '--bam', args.bam,
+                                            '--fragments', args.fragments,
                                             '--fasta', args.fasta, '--pwm', args.pwm,
+                                            '--chroms_keep', args.chroms_keep,
                                             '--out',args.out,'--cores',args.cores]))
         vprocess_args = parser.parse_args(['vprocess','--sizes',args.out+'.nuc_dist.txt','--out',args.out])
         nuc_args_list = ['nuc','--bed',args.bed,'--bam',args.bam,'--out',args.out,'--cores', str(args.cores),
@@ -96,19 +100,27 @@ def add_occ_parser( subparsers):
     parser = subparsers.add_parser("occ", help = "nucleoatac function:  Call nucleosome occupancy")
     group1 = parser.add_argument_group('Required', 'Necessary arguments')
     group1.add_argument('--bed', metavar='bed_file' , help = 'Peaks in bed format', required=True)
-    group1.add_argument('--bam', metavar='bam_file',
-                    help = 'Sorted (and indexed) BAM file', required=True)
+    group1.add_argument('--fasta', metavar = 'genome_seq', required=True,
+                    help = 'Indexed fasta file. Required for chromosome sizes calculation and bias calculation')
     group1.add_argument('--out', metavar='basename',
                     help="give output basename", required = True)
-    group4 = parser.add_argument_group("Bias calculation information","Highly recommended. If fasta is not provided, will not calculate bias")
-    group4.add_argument('--fasta', metavar = 'genome_seq',
-                    help = 'Indexed fasta file')
+    
+    # modified to take in BAM or fragments file
+    group0 = parser.add_mutually_exclusive_group(required=True)
+    group0.add_argument('--bam', metavar='bam_file', help = 'Aligned reads', type=str)
+    group0.add_argument('--fragments', metavar='frag_file', help = 'Sorted fragments file, compressed and with tabix saved index as filename.tbi', type=str)
+
+    group4 = parser.add_argument_group("Bias calculation information","Highly recommended.")
     group4.add_argument('--pwm', metavar = 'Tn5_PWM', help = "PWM descriptor file. Default is Human.PWM.txt included in package", default = "Human")
+
     group2 = parser.add_argument_group('General Options', '')
     group2.add_argument('--sizes', metavar = 'fragmentsizes_file',
-                       help = "File with fragment size distribution.  Use if don't want calculation of fragment size")
+                       help = "File with fragment size distribution.  Use if don't want calculation of fragment size from BAM.")
     group2.add_argument('--cores', metavar = 'int',default=1,
                     help='Number of cores to use',type=int)
+    group2.add_argument('--chroms_keep', metavar = 'chroms_keep', default = None,
+                        help = "Comma separated list of chromosomes to restrict analysis to. Default is to use all.")
+    
     group3 = parser.add_argument_group('Occupancy parameter', 'Change with caution')
     group3.add_argument('--upper',metavar="int",default=251,
     help="upper limit in insert size. default is 251",type=int)
@@ -153,6 +165,7 @@ def add_nfr_parser( subparsers):
     group6 = parser.add_argument_group("Insertion track options","Either input insertion track or bamfile")
     group6.add_argument('--ins_track', metavar = 'ins_file', 
                         help = "bgzip compressed, tabix-indexed bedgraph file with insertion track. will be generated if not included")
+    # TODO: add option for fragments file input
     group6.add_argument('--bam', metavar='bam_file',
                     help = 'Sorted (and indexed) BAM file')
     group4 = parser.add_argument_group("Bias calculation information","Highly recommended. If fasta is not provided, will not calculate bias")
@@ -205,6 +218,7 @@ def add_nuc_parser( subparsers):
     group1.add_argument('--bed', metavar='bed_file' , help = 'Regions for which \
         to do stuff.', required=True)
     group1.add_argument('--vmat', metavar='vdensity_file', help = "VMat object", required=True)
+    # TODO: add option for fragments file input
     group1.add_argument('--bam', metavar='bam_file',
                     help = 'Accepts sorted BAM file', required=True)
     group1.add_argument('--out', metavar='basename',
@@ -248,6 +262,7 @@ def add_run_parser( subparsers):
     group1 = parser.add_argument_group('Required', 'Necessary arguments')
     group1.add_argument('--bed', metavar='bed_file' , help = 'Regions for which \
         to do stuff.', required=True)
+    # TODO: add option for fragments file input
     group1.add_argument('--bam', metavar='bam_file',
                     help = 'Accepts sorted BAM file', required=True)
     group1.add_argument('--out', metavar='output_basename',

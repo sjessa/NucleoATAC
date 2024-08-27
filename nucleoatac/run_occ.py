@@ -14,7 +14,7 @@ import numpy as np
 import traceback
 import itertools
 import pysam
-from pyatac.utils import shell_command,read_chrom_sizes_from_bam, read_chrom_sizes_from_fasta
+from pyatac.utils import shell_command,read_chrom_sizes_from_bam,read_chrom_sizes_from_fasta
 from pyatac.chunk import ChunkList
 from nucleoatac.Occupancy import FragmentMixDistribution, OccupancyParameters, OccChunk
 from pyatac.fragmentsizes import FragmentSizes
@@ -78,26 +78,75 @@ def run_occ(args):
     """run occupancy calling
 
     """
-    if args.fasta:
-        chrs = read_chrom_sizes_from_fasta(args.fasta)
-    else:
-        chrs = read_chrom_sizes_from_bam(args.bam)
+
+    # modified to deliberately get the chromosome sizes from the fasta file, 
+    # to not use the BAM file.
+    chrs = read_chrom_sizes_from_fasta(args.fasta)
+
     pwm = PWM.open(args.pwm)
-    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = args.flank + args.upper/2 + max(pwm.up,pwm.down) + args.nuc_sep/2)
+
+    # modified to optionally keep only certain chromosomes
+    if args.chroms_keep is not None:
+        # parse comma separated list of chromosomes
+        chroms_keep = args.chroms_keep.split(',')
+        print "@ NOTE: restricting analysis to chromosomes: " + ", ".join(chroms_keep)
+    else:
+        chroms_keep = None
+
+    # process peaks into chunks
+    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = args.flank + args.upper/2 + max(pwm.up,pwm.down) + args.nuc_sep/2, chroms_keep = chroms_keep)
     chunks.slop(chrs, up = args.nuc_sep/2, down = args.nuc_sep/2)
     chunks.merge()
     maxQueueSize = args.cores*10
     fragment_dist = FragmentMixDistribution(0, upper = args.upper)
+
+    print "@ calculating fragment sizes..."
+
+    # if sizes are provided, use them
     if args.sizes is not None:
         tmp = FragmentSizes.open(args.sizes)
         fragment_dist.fragmentsizes = FragmentSizes(0, args.upper, vals = tmp.get(0,args.upper))
+    # otherwise, calculate them either from the BAM or fragments file
     else:
-        fragment_dist.getFragmentSizes(args.bam, chunks)
+        if args.bam is not None:
+            fragment_dist.getFragmentSizes(input_file = args.bam, input_type = "bam", chunklist = chunks)
+        elif args.fragments is not None:
+            fragment_dist.getFragmentSizes(input_file = args.fragments, input_type = "fragments", chunklist = chunks)
+        
+    # plot the fragment size distribution, as in pyatac.get_sizes
+    fig = plt.figure()
+    plt.plot(range(fragment_dist.fragmentsizes.lower,fragment_dist.fragmentsizes.upper),
+             fragment_dist.fragmentsizes.get(fragment_dist.fragmentsizes.lower,fragment_dist.fragmentsizes.upper), label = args.out)
+    # add title
+    plt.title("Fragment Size Distribution")
+    plt.xlabel("Fragment Size")
+    plt.ylabel("Frequency")
+    fig.savefig(args.out+'.fragmentsizes.pdf')
+    plt.close(fig)
+
+    print "@ fitting fragment size distribution..."
     fragment_dist.modelNFR()
-    fragment_dist.plotFits(args.out + '.occ_fit.eps')
+    fragment_dist.plotFits(args.out + '.occ_fit.pdf')
     fragment_dist.fragmentsizes.save(args.out + '.fragmentsizes.txt')
-    params = OccupancyParameters(fragment_dist, args.upper, args.fasta, args.pwm, sep = args.nuc_sep, min_occ = args.min_occ,
-            flank = args.flank, bam = args.bam, ci = args.confidence_interval, step = args.step)
+
+    # set input_file/input_type based on whichever file is provided
+    if args.bam is not None:
+        input_file = args.bam
+        input_type = "bam"
+    elif args.fragments is not None:
+        input_file = args.fragments
+        input_type = "fragments"
+
+    params = OccupancyParameters(fragment_dist, args.upper, args.fasta, args.pwm,
+                                 sep = args.nuc_sep, min_occ = args.min_occ,
+                                 flank = args.flank,
+                                 # refactored to take in the input file and
+                                 # corresponding file type (BAM or fragments)
+                                 input_file = input_file,
+                                 input_type = input_type,
+                                 ci = args.confidence_interval, step = args.step)
+    
+    print "@ calculating occupancy..."
     sets = chunks.split(items = args.cores * 5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))
     out_handle1 = open(args.out + '.occ.bedgraph','w')
@@ -115,6 +164,10 @@ def run_occ(args):
     peaks_process = mp.Process(target = _writePeaks, args=(peaks_queue, args.out))
     peaks_process.start()
     nuc_dist = np.zeros(args.upper)
+
+    # NOTE: _occHlper takes a tuple as input, containing the chunk and the parameters.
+    # This is the part that actually executes the occupancy calling. It doesn't need
+    # to be modified directly, but calls occ.process in nucleoatac.Occupancy.OccChunk.process which we have modified slightly.
     for j in sets:
         tmp = pool1.map(_occHelper, zip(j,itertools.repeat(params)))
         for result in tmp:
@@ -127,6 +180,8 @@ def run_occ(args):
     peaks_queue.put('STOP')
     write_process.join()
     peaks_process.join()
+
+    print "@ compressing and indexing output files..."
     pysam.tabix_compress(args.out + '.occpeaks.bed', args.out + '.occpeaks.bed.gz',force = True)
     shell_command('rm ' + args.out + '.occpeaks.bed')
     pysam.tabix_index(args.out + '.occpeaks.bed.gz', preset = "bed", force = True)
@@ -138,14 +193,18 @@ def run_occ(args):
     dist_out = FragmentSizes(0, args.upper, vals = nuc_dist)
     dist_out.save(args.out + '.nuc_dist.txt')
 
-    print "Making figure"
+    print "@ making figure"
     #make figure
     fig = plt.figure()
     plt.plot(range(0,args.upper),dist_out.get(0,args.upper),label = "Nucleosome Distribution")
+    # add title
+    plt.title("Nucleosome Distribution")
     plt.xlabel("Fragment Size")
     plt.ylabel("Frequency")
-    fig.savefig(args.out+'.nuc_dist.eps')
+    fig.savefig(args.out+'.nuc_dist.pdf')
     plt.close(fig)
+
+    print "@ done."
 
 
 

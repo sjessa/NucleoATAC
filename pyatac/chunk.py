@@ -129,10 +129,26 @@ class ChunkList(list):
         for chunk in self:
             out += chunk.asBed() +"\n"
         return out
+    
     @staticmethod
     def read(bedfile, weight_col=None, strand_col = None, name_col = None, chromDict = None,
-                min_offset = None, min_length = 1, chrom_source = "FASTA file"):
-        """Make a list of chunks from a tab-delimited bedfile"""
+                min_offset = None, min_length = 1, chrom_source = "FASTA file", chroms_keep = None):
+        """
+        Make a list of chunks from a tab-delimited bedfile. Modified to allow 
+        chunking of regions only on specified chromosomes.
+        
+        Args:
+        - bedfile: path to bed file containing regions to analyze
+        - weight_col: column in bedfile with weight information
+        - strand_col: column in bedfile
+        - name_col: column in bedfile
+        - chromDict: dictionary of chromosome sizes
+        - min_offset: minimum offset from chromosome ends
+        - min_length: minimum length of region
+        - chrom_source: source of chromosome sizes
+        - chroms_keep: list of chromosomes to keep
+        
+        """
         if bedfile[-3:] == '.gz':
             infile = gzip.open(bedfile,"r")
         else:
@@ -154,6 +170,11 @@ class ChunkList(list):
             start = int(in_line[1])
             end = int(in_line[2])
             chrom = in_line[0]
+
+            # only analyze regions on specified chromosomes
+            if chroms_keep is not None and chrom not in chroms_keep:
+                continue
+
             if chromDict is not None and chrom not in chromDict.keys():
                 bad_chroms.append(chrom)
                 continue

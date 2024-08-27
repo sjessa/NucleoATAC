@@ -5,6 +5,7 @@ import matplotlib.cm as cm
 from pyatac.tracks import InsertionTrack
 import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()})
 from fragments import makeFragmentMat
+from nucleoatac.fragments_handling import makeFragmentMatFromFragments
 
 class ChunkMat2D:
     """Class that stores fragments in 2D matrix according to
@@ -110,10 +111,15 @@ class ChunkMat2D:
 
 
 class FragmentMat2D(ChunkMat2D):
-    """Class that stores fragment information in 2D matrix according"""
+    """
+    Class that stores fragment information in 2D matrix according to fragment length and position.
+    Modified to allow calculation of fragment matrix from either BAM or fragments file.
+    """
+
     def __init__(self, chrom, start, end, lower, upper, atac = True):
-        ChunkMat2D.__init__(self,chrom, start, end, lower, upper)
+        ChunkMat2D.__init__(self, chrom, start, end, lower, upper)
         self.atac = atac
+
     def updateMat(self, fragment):
         row = fragment.insert - self.lower
         if self.mode == "centers":
@@ -127,9 +133,14 @@ class FragmentMat2D(ChunkMat2D):
                 self.mat[row, col1] += 1
             if col2>=0 and col2<self.ncol and row<self.nrow and row>=0:
                 self.mat[row, col2] += 1
-    def makeFragmentMat(self, bamfile):
-        """Make 2D matrix"""
-        self.mat = makeFragmentMat(bamfile, self.chrom, self.start, self.end, self.lower, self.upper, self.atac)
+
+    def makeFragmentMat(self, input_file, input_type):
+        """Make 2D fragment matrix containing fragment lengths & positions"""
+
+        if input_type == "bam":
+            self.mat = makeFragmentMat(input_file, self.chrom, self.start, self.end, self.lower, self.upper, self.atac)
+        elif input_type == "fragments":
+            self.mat = makeFragmentMatFromFragments(input_file, self.chrom, self.start, self.end, self.lower, self.upper, self.atac)
 
 
 class BiasMat2D(ChunkMat2D):
