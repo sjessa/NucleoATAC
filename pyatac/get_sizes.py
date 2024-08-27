@@ -19,14 +19,25 @@ def get_sizes(args):
     """
     if args.out is None:
         args.out = '.'.join(os.path.basename(args.bam).split('.')[0:-1])
+
     sizes = FragmentSizes(lower = args.lower, upper = args.upper, atac = args.atac)
-    if args.bed:
-        chunks = ChunkList.read(args.bed)
-        chunks.merge()
-        sizes.calculateSizes(args.bam, chunks)
-    else:
-        sizes.calculateSizes(args.bam)
+
+    # depending on the input, perform the appropriate frag size distribution calculation
+    if args.bam:
+
+        if args.bed:
+            chunks = ChunkList.read(args.bed)
+            chunks.merge()
+            sizes.calculateSizes(input_file = args.bam, input_type = "bam", chunks = chunks)
+        else:
+            sizes.calculateSizes(input_file = args.bam, input_type = "bam")
+
+    elif args.fragments:
+
+        sizes.calculateSizes(input_file = args.fragments, input_type = "fragments")
+
     sizes.save(args.out+'.fragmentsizes.txt')
+
     if not args.no_plot:
         #make figure
         fig = plt.figure()

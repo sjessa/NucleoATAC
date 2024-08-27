@@ -88,7 +88,7 @@ def pyatac_parser():
     return argparser
 
 def add_counts_parser( subparsers):
-    """Add argument parsers for the sizes utility
+    """Add argument parsers for the counts utility
 
     """
     parser = subparsers.add_parser("counts", help = "pyatac function-- compute fragment counts within windows")
@@ -109,15 +109,21 @@ def add_counts_parser( subparsers):
 
 
 def add_sizes_parser( subparsers):
-    """Add argument parsers for the sizes utility
+    """
+    Add argument parsers for the sizes utility
+    NOTE: modified to take in fragments file instead of BAM file.
 
     """
     parser = subparsers.add_parser("sizes", help = "pyatac function-- compute fragment size distribution")
-    group0 = parser.add_argument_group('Required', 'Necessary arguments')
-    group0.add_argument('--bam', metavar='bam_file', help = 'Aligned reads', required=True)
+
+    # modified to take in BAM or fragments file
+    group0 = parser.add_mutually_exclusive_group(required=True)
+    group0.add_argument('--bam', metavar='bam_file', help = 'Aligned reads', type=str)
+    group0.add_argument('--fragments', metavar='frag_file', help = 'Sorted fragments file', type=str)
+
     group2 = parser.add_argument_group('Find only fragmentsizes for regions of genome')
     group2.add_argument('--bed', metavar='bed_file',
-                        help = 'Only compute size distribution for fragment centered within regions in bed file')
+                        help = 'Only compute size distribution for fragment centered within regions in bed file. NOTE: only works in conjunction w/ BAM files as input, not yet implemented for fragments files.')
     group3 = parser.add_argument_group('Options', 'Optional settings')
     group3.add_argument('--out', metavar='output_basename', help = "Basename for output")
     group3.add_argument('--not_atac', action="store_false", dest = "atac", default = True, help = "Don't use atac offsets")

@@ -8,23 +8,30 @@ import numpy as np
 import pyximport
 pyximport.install(setup_args={"include_dirs":np.get_include()})
 from pyatac.fragments import getAllFragmentSizes, getFragmentSizesFromChunkList
-
-
+from nucleoatac.fragments_handling import getAllFragmentSizesFromFragsFile
 
 
 class FragmentSizes:
     """Class for storing fragment size distribution"""
+
     def __init__(self, lower, upper, atac = True, vals = None):
         self.lower = lower
         self.upper = upper
         self.vals = vals
         self.atac = atac
-    def calculateSizes(self, bamfile, chunks = None):
-        if chunks is None:
-            sizes = getAllFragmentSizes(bamfile, self.lower, self.upper, atac = self.atac)
-        else:
-            sizes = getFragmentSizesFromChunkList(chunks, bamfile, self.lower, self.upper, atac = self.atac)
+
+    def calculateSizes(self, input_file, input_type = "bam", chunks = None):
+        """Calculate fragment size distribution from a BAM file or fragments file"""
+        if input_type == "bam":
+            if chunks is None:
+                sizes = getAllFragmentSizes(input_file, self.lower, self.upper, atac = self.atac)
+            else:
+                sizes = getFragmentSizesFromChunkList(chunks, input_file, self.lower, self.upper, atac = self.atac)
+        elif input_type == "fragments":
+            sizes = getAllFragmentSizesFromFragsFile(input_file, self.lower, self.upper)
+            
         self.vals = sizes / (np.sum(sizes) + (np.sum(sizes)==0))
+
     def get(self, lower = None, upper = None, size = None):
         if size:
             try:
@@ -42,6 +49,7 @@ class FragmentSizes:
                 return self.vals[y1:y2]
             except:
                 raise Exception("Looks like dimensions from get probaby don't match FragmentSizes")
+            
     def save(self, filename):
         """Save Fragment Distribution information"""
         f = open(filename,"w")
@@ -52,6 +60,7 @@ class FragmentSizes:
         f.write("#sizes\n")
         f.write("\t".join(map(str,self.get()))+"\n")
         f.close()
+
     @staticmethod
     def open(filename):
         """Create FragmentDistribution object from text descriptor file"""

@@ -1,5 +1,42 @@
 # NucleoATAC
 
+## Update 2024/08/26
+
+This is a fork of the NucleoATAC package authored by Alicia Schep in the Greenleaf Lab,
+a package for calling nucleosome occupancy from ATAC-seq data.
+We modify the package to take fragments files as inputs instead of BAM files.
+This fork is not being officially maintained. Please refer to the original package
+for the last stable version.
+
+
+### Installation
+
+1. Create a conda environment
+
+```bash
+conda create -n "nucleoatac" python=2.7.13
+conda activate nucleoatac
+```
+
+2. Install the package
+
+```bash
+cd NucleoATAC
+pip install --editable .
+```
+
+
+### Updates to functionality
+
+- The `pyatac sizes` command now can now accept a fragments file instead of BAM file
+- The `pyatac.fragmentsizes` module has been updated so that the `FragmentSizes` class
+  can now accept a fragments file instead of a BAM file for calculation of the fragment
+  size distribution. This makes use of new functions in the `nucleoatac.fragments_handling` module.
+
+
+
+## Previously
+
 **This package is no longer being actively maintained; feel free to post issues that others in the community may respond to, but this package will likely not be updated further. Additionally, if anyone wants to maintain a fork of the package or has developed an alternative package for similar purposes, would be happy to link to that repo here.**
 
 Python package for calling nucleosomes using ATAC-seq data.
