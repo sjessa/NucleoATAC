@@ -22,19 +22,26 @@ def get_sizes(args):
 
     sizes = FragmentSizes(lower = args.lower, upper = args.upper, atac = args.atac)
 
+    if args.bed:
+        print("@ calculating chunks.")
+        chunks = ChunkList.read(args.bed)
+        chunks.merge()
+
     # depending on the input, perform the appropriate frag size distribution calculation
     if args.bam:
-
         if args.bed:
-            chunks = ChunkList.read(args.bed)
-            chunks.merge()
+            print("@ calculating sizes in chunks...")
             sizes.calculateSizes(input_file = args.bam, input_type = "bam", chunks = chunks)
         else:
+            print("@ calculating sizes...")
             sizes.calculateSizes(input_file = args.bam, input_type = "bam")
-
     elif args.fragments:
-
-        sizes.calculateSizes(input_file = args.fragments, input_type = "fragments")
+        if args.bed:
+            print("@ calculating sizes in chunks...")
+            sizes.calculateSizes(input_file = args.fragments, input_type = "fragments", chunks = chunks)
+        else:
+            print("@ calculating sizes...")
+            sizes.calculateSizes(input_file = args.fragments, input_type = "fragments")
 
     sizes.save(args.out+'.fragmentsizes.txt')
 

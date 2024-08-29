@@ -22,7 +22,8 @@ def getAllFragmentSizesFromFragsFile(fragments, lower, upper):
     - lower: lower bound for fragment sizes to consider
     - upper: upper bound for fragment sizes to consider
     
-    
+    Returns:
+    - sizes: NumPy array containing the fragment size distribution within the specified range.
     """
 
     # initialize an array to hold the size counts within the specified range
@@ -34,7 +35,7 @@ def getAllFragmentSizesFromFragsFile(fragments, lower, upper):
     # fetch to get an iterator over all fragments
     for row in tbx.fetch(parser=pysam.asBed()):
             
-        # split the line into columns
+        # extract coords of fragment
         start = int(row.start)
         end = int(row.end)
 
@@ -45,7 +46,59 @@ def getAllFragmentSizesFromFragsFile(fragments, lower, upper):
         if lower <= ilen < upper:
             sizes[ilen - lower] += 1
 
+    tbx.close()
+
     return sizes
+
+
+
+
+def getAllFragmentSizesFromFragsFileFromChunkList(chunks, fragments, lower, upper):
+    """
+    Calculate fragment size distribution from a tabix-indexed fragments file in BED format,
+    using a ChunkList to specify the regions of interest. Adapted from pyatac.fragments.getFragmentSizesFromChunkList.
+
+    Args:
+    - chunks: ChunkList object containing regions of interest.
+    - fragments: path to the tabix-indexed BED file containing fragments (e.g., .bed.gz).
+    - lower: lower bound for fragment sizes to consider.
+    - upper: upper bound for fragment sizes to consider.
+
+    Returns:
+    - sizes: NumPy array containing the fragment size distribution within the specified range.
+    """
+    
+    # initialize an array to hold the size counts within the specified range
+    sizes = np.zeros(upper - lower, dtype=np.float)
+
+    # open the tabix-indexed fragments file using pysam
+    tbx = pysam.TabixFile(fragments)
+
+    # iterate over each chunk in the ChunkList
+    for chunk in chunks:
+        
+        # fetch fragments in the specified chunk region
+        for row in tbx.fetch(chunk.chrom, max(0, chunk.start - upper), chunk.end + upper, parser=pysam.asBed()):
+
+            # extract coords of fragment
+            fragment_start = int(row.start)
+            fragment_end = int(row.end)
+
+            # calculate fragment size
+            ilen = fragment_end - fragment_start
+
+            # calculate the center of the fragment
+            center = fragment_start + (ilen - 1) / 2
+
+            # check if fragment size is within the specified bounds and if the center is within the chunk
+            if lower <= ilen < upper and chunk.start <= center < chunk.end:
+                sizes[ilen - lower] += 1
+
+    tbx.close()
+
+    return sizes
+
+
 
 
 def makeFragmentMatFromFragments(fragments, chrom, start, end, lower, upper, atac):

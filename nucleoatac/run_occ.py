@@ -116,13 +116,26 @@ def run_occ(args):
     # plot the fragment size distribution, as in pyatac.get_sizes
     fig = plt.figure()
     plt.plot(range(fragment_dist.fragmentsizes.lower,fragment_dist.fragmentsizes.upper),
-             fragment_dist.fragmentsizes.get(fragment_dist.fragmentsizes.lower,fragment_dist.fragmentsizes.upper), label = args.out)
+             fragment_dist.fragmentsizes.get(fragment_dist.fragmentsizes.lower,fragment_dist.fragmentsizes.upper),
+             label = args.out)
     # add title
     plt.title("Fragment Size Distribution")
     plt.xlabel("Fragment Size")
     plt.ylabel("Frequency")
     fig.savefig(args.out+'.fragmentsizes.pdf')
     plt.close(fig)
+
+    # plot a second with wider domain, max size as in ArchR
+    # fig = plt.figure()
+    # plt.plot(range(0,750),
+    #          fragment_dist.fragmentsizes.get(0, 750),
+    #          label = args.out)
+    # # add title
+    # plt.title("Fragment Size Distribution")
+    # plt.xlabel("Fragment Size")
+    # plt.ylabel("Frequency")
+    # fig.savefig(args.out+'.fragmentsizes_widerange.pdf')
+    # plt.close(fig)
 
     print "@ fitting fragment size distribution..."
     fragment_dist.modelNFR()

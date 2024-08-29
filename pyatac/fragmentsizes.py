@@ -9,7 +9,7 @@ import numpy as np
 import pyximport
 pyximport.install(setup_args={"include_dirs":np.get_include()})
 from pyatac.fragments import getAllFragmentSizes, getFragmentSizesFromChunkList
-from nucleoatac.fragments_handling import getAllFragmentSizesFromFragsFile
+from nucleoatac.fragments_handling import getAllFragmentSizesFromFragsFile,getAllFragmentSizesFromFragsFileFromChunkList
 
 
 class FragmentSizes:
@@ -29,7 +29,10 @@ class FragmentSizes:
             else:
                 sizes = getFragmentSizesFromChunkList(chunks, input_file, self.lower, self.upper, atac = self.atac)
         elif input_type == "fragments":
-            sizes = getAllFragmentSizesFromFragsFile(input_file, self.lower, self.upper)
+            if chunks is None:
+                sizes = getAllFragmentSizesFromFragsFile(input_file, self.lower, self.upper)
+            else:
+                sizes = getAllFragmentSizesFromFragsFileFromChunkList(chunks, input_file, self.lower, self.upper)
             
         self.vals = sizes / (np.sum(sizes) + (np.sum(sizes)==0))
 

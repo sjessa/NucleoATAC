@@ -40,9 +40,11 @@ def nucleoatac_main(args):
                                             '--chroms_keep', args.chroms_keep,
                                             '--out',args.out,'--cores',args.cores]))
         vprocess_args = parser.parse_args(['vprocess','--sizes',args.out+'.nuc_dist.txt','--out',args.out])
-        nuc_args_list = ['nuc','--bed',args.bed,'--bam',args.bam,'--out',args.out,'--cores', str(args.cores),
-                                        '--occ_track', args.out + '.occ.bedgraph.gz','--vmat', args.out + '.VMat',
-                                        '--fasta', args.fasta, '--pwm', args.pwm, '--sizes', args.out + '.fragmentsizes.txt']
+        nuc_args_list = ['nuc','--bed',args.bed,'--bam',args.bam,
+                         '--fragments',args.fragments,
+                         '--out',args.out,'--cores', str(args.cores),
+                        '--occ_track', args.out + '.occ.bedgraph.gz','--vmat', args.out + '.VMat',
+                        '--fasta', args.fasta, '--pwm', args.pwm, '--sizes', args.out + '.fragmentsizes.txt']
         if args.write_all:
             nuc_args_list.extend(['--write_all'])
         nuc_args = parser.parse_args(nuc_args_list)
@@ -121,7 +123,7 @@ def add_occ_parser( subparsers):
     group2.add_argument('--chroms_keep', metavar = 'chroms_keep', default = None,
                         help = "Comma separated list of chromosomes to restrict analysis to. Default is to use all.")
     
-    group3 = parser.add_argument_group('Occupancy parameter', 'Change with caution')
+    group3 = parser.add_argument_group('Occupancy parameters', 'Change with caution')
     group3.add_argument('--upper',metavar="int",default=251,
     help="upper limit in insert size. default is 251",type=int)
     group3.add_argument('--flank',metavar="int",default=60,
@@ -191,7 +193,7 @@ def add_vprocess_parser( subparsers):
     group1 = parser.add_argument_group('Required', 'Necessary arguments')
     group1.add_argument('--out', metavar='output_basename',required=True)
     group2 = parser.add_argument_group('VPlot and Insert Size Options', 'Optional')
-    group2.add_argument('--sizes', metavar='file' , help = 'Insert distribution file')
+    group2.add_argument('--sizes', metavar='file' , help = 'Insert distribution file, <output_basename>.nuc_dist.txt from nucleoatac occ.')
     group2.add_argument('--vplot', metavar='vmat_file',
                     help = 'Accepts VMat file.  Default is Vplot from S. Cer.',
                     default = nucleoatac.Magic.default_vplot)

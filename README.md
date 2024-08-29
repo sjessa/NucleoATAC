@@ -42,6 +42,7 @@ pip install --editable .
   can now accept a fragments file instead of a BAM file for calculation of the fragment
   size distribution, which will fetch the chunk region from the fragments file
   using `pysam`'s tabix interface, and then populate the 2D matrix
+- Add chunk handling for the fragemnts file as well
 
 
 #### Restrict analysis to chromosomes of interest
@@ -60,7 +61,7 @@ pip install --editable .
 
 ### Timing
 
-For reference, running only on chr1 (with 7,267,633 fragments) on 16 cores and 64G of memory took about 14 minutes.
+For reference, running only on chr1 (with 7,267,633 fragments) on 4 cores and 64G of memory took about 14 minutes.
 
 ```
 Command run:  /path/to/.local/bin/nucleoatac occ --fragments ../data/Eye_c11__sorted.tsv.gz --bed ../data/Eye_c11__peaks_overlap_filtered.narrowPeak --fasta
