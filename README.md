@@ -27,8 +27,15 @@ cd NucleoATAC
 pip install --editable .
 ```
 
+**_NOTE_**: to edit the package and install the new version, update the version
+number in `setup.py` for documentation, then re-run the above pip command.
+Test the install with `pyatac --version`.
+
 
 ### Updates to functionality
+
+**_NOTE_**: `nucleoatac run` doesn't work with the modifications for fragment
+sizes yet. Run commands individually as per [the docs](https://nucleoatac.readthedocs.io/en/latest/nucleoatac/).
 
 #### Allowing fragments files as input
 - Goal: allow nucleosome calling to be performed with tabix-indexed compressed fragments files in BED format
@@ -38,11 +45,14 @@ pip install --editable .
 - The following commands now can now accept a fragments file instead of BAM file:
   - `pyatac sizes`
   - `nucleoatac occ` 
+  - `nucleoatac nuc`
 - The `pyatac.chunkmat2d.FragmentMat2D` module has been updated so that the `FragmentMat2D` class
   can now accept a fragments file instead of a BAM file for calculation of the fragment
   size distribution, which will fetch the chunk region from the fragments file
   using `pysam`'s tabix interface, and then populate the 2D matrix
 - Add chunk handling for the fragemnts file as well
+- When commands required BAM files for calculation of fragment sizes, the fragment sizes output
+  from previous commands is now required instead
 
 
 #### Restrict analysis to chromosomes of interest
@@ -52,10 +62,12 @@ pip install --editable .
 - The `nucleotac occ` command now accepts a `--chroms_keep` argument that allows users
   to specify a list of chromosomes to restrict the occupancy calculation to, and a chunk
   list will only be generated for these chromosomes.
+- This can be used to manually parallelize the runs, or do a quick run for debugging
 
 
 #### Misc
 - `nucleoatac occ` and `pyatac sizes` changed to produce .pdf instead of .eps files
+- More verbose messaging added in `nucleoatac occ` and `nucleoatac nuc`
 
 
 

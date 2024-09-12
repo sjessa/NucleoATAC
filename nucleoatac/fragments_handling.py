@@ -2,6 +2,10 @@
 Utilities for handling fragments files as input to NucleoATAC.
 
 @author: Selin Jessa, Greenleaf Lab, Stanford University. Adapted from Alicia Schep.
+
+NOTE: in general, for fragments, we will assume they're already shifted +4/-4.
+So unlike the BAM-handling counterparts to the functions here, we won't take in an `atac`
+argument, and no shifting will be done for fragments.
 """
 
 import numpy as np
@@ -12,9 +16,6 @@ def getAllFragmentSizesFromFragsFile(fragments, lower, upper):
     Calculate fragment size distribution from a fragments file in BED format.
     Adapted from pyatac.fragments.getAllFragmentSizes, to use
     a fragments file as input instead of a BAM file.
-
-    TODO: should this also be restricted, if the analysis is run on a restricted
-    set of chromosomes using the chroms_keep paramter to occ?
 
     Args:
     - fragments: path to the compressed, tabix-indexed BED file containing fragments. Tabix index
@@ -101,7 +102,7 @@ def getAllFragmentSizesFromFragsFileFromChunkList(chunks, fragments, lower, uppe
 
 
 
-def makeFragmentMatFromFragments(fragments, chrom, start, end, lower, upper, atac):
+def makeFragmentMatFromFragments(fragments, chrom, start, end, lower, upper):
     """
     Generate a fragment matrix from a fragments file in BED format. This function
     produces a 2D matrix (fragment matrix) where each row represents a different
@@ -151,6 +152,61 @@ def makeFragmentMatFromFragments(fragments, chrom, start, end, lower, upper, ata
             # check if the calculated column and row are within the matrix bounds
             if 0 <= col < ncol and 0 <= row < nrow:
                 mat[row, col] += 1
+
+    # close the tabix file
+    tbx.close()
+
+    return mat
+
+
+
+
+def getInsertionsFromFragments(fragments, chrom, start, end, lower = 0, upper = 2000):
+    """
+    Calculate insertions from a tabix-indexed fragments file in BED format.
+    This function generates an insertion profile (1D array) for a specified
+    genomic region. Adapted from pyatac.fragments.getInsertions.
+
+    Args:
+    - fragments: path to the compressed, tabix-indexed BED file containing fragments.
+    - chrom: chromosome corresponding to the region to process.
+    - start: start position for the region to process.
+    - end: end position for the region to process.
+    - lower: lower bound for fragment sizes to consider.
+    - upper: upper bound for fragment sizes to consider.
+
+    Returns:
+    - mat: NumPy array containing the count of insertions at each position within the specified region.
+    """
+
+    # initialize an array to hold the insertion counts within the specified region
+    npos = end - start
+    mat = np.zeros(npos, dtype=np.float)
+
+    # open the tabix-indexed fragments file using pysam
+    tbx = pysam.TabixFile(fragments)
+
+    # fetch fragments in the specified region
+    for row in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
+        
+        # get coordinates of the fragment
+        fragment_start = int(row.start)
+        fragment_end = int(row.end)
+
+        # calculate fragment size
+        ilen = fragment_end - fragment_start
+
+        # ensure the fragment size is within the specified bounds
+        if lower <= ilen < upper:
+            # calculate left (l_pos) and right (r_pos) insertion positions
+            l_pos = fragment_start
+            r_pos = fragment_end - 1
+
+            # increment the count at the insertion positions if within bounds
+            if start <= l_pos < end:
+                mat[l_pos - start] += 1
+            if start <= r_pos < end:
+                mat[r_pos - start] += 1
 
     # close the tabix file
     tbx.close()

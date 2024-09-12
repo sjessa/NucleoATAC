@@ -12,7 +12,7 @@ import numpy as np
 import traceback
 import itertools
 import pysam
-from pyatac.utils import shell_command,read_chrom_sizes_from_bam, read_chrom_sizes_from_fasta
+from pyatac.utils import shell_command,read_chrom_sizes_from_fasta
 from pyatac.chunk import ChunkList
 from nucleoatac.NucleosomeCalling import NucChunk, NucParameters
 from pyatac.fragmentsizes import FragmentSizes
@@ -27,9 +27,12 @@ def _nucHelper(arg):
     try:
         nuc = NucChunk(chunk)
         nuc.process(params)
-        out = {'nucpos' : [nuc.nuc_collection[i] for i in sorted(nuc.nonredundant)], 'nucpos.redundant' : [nuc.nuc_collection[i] for i in sorted(nuc.redundant)],
-                               'nucleoatac_signal' : nuc.norm_signal, 'nucleoatac_raw' : nuc.nuc_signal, 'nucleoatac_background' : nuc.bias,
-                               'nucleoatac_signal.smooth' : nuc.smoothed}
+        out = {'nucpos' : [nuc.nuc_collection[i] for i in sorted(nuc.nonredundant)],
+               'nucpos.redundant' : [nuc.nuc_collection[i] for i in sorted(nuc.redundant)],
+               'nucleoatac_signal' : nuc.norm_signal,
+               'nucleoatac_raw' : nuc.nuc_signal,
+               'nucleoatac_background' : nuc.bias,
+               'nucleoatac_signal.smooth' : nuc.smoothed}
         nuc.removeData()
     except Exception as e:
         print('Caught exception when processing:\n'+  chunk.asBed()+"\n")
@@ -142,25 +145,50 @@ def run_nuc(args):
     """run occupancy calling
 
     """
+
+    # modified to deliberately get the chromosome sizes from the fasta file, 
+    # to not use the BAM file.
+    chrs = read_chrom_sizes_from_fasta(args.fasta)
+
     vmat = VMat.open(args.vmat)
-    if args.fasta:
-        chrs = read_chrom_sizes_from_fasta(args.fasta)
-    else:
-        chrs = read_chrom_sizes_from_bam(args.bam)
+    
     pwm = PWM.open(args.pwm)
-    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = vmat.mat.shape[1] + vmat.upper/2 + max(pwm.up,pwm.down) + args.nuc_sep/2, min_length = args.nuc_sep * 2)
+
+    # modified to optionally keep only certain chromosomes
+    if args.chroms_keep is not None:
+        # parse comma separated list of chromosomes
+        chroms_keep = args.chroms_keep.split(',')
+        print "@ NOTE: restricting analysis to chromosomes: " + ", ".join(chroms_keep)
+    else:
+        chroms_keep = None
+
+    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = vmat.mat.shape[1] + vmat.upper/2 + max(pwm.up,pwm.down) + args.nuc_sep/2, min_length = args.nuc_sep * 2, chroms_keep = chroms_keep)
     chunks.slop(chrs, up = args.nuc_sep/2, down = args.nuc_sep/2)
     chunks.merge()
     maxQueueSize = args.cores*10
-    if args.sizes is not None:
-        fragment_dist = FragmentSizes.open(args.sizes)
-    else:
-        fragment_dist = FragmentSizes(0, upper = vmat.upper)
-        fragment_dist.calculateSizes(args.bam, chunks)
-    params = NucParameters(vmat = vmat, fragmentsizes = fragment_dist, bam = args.bam, fasta = args.fasta, pwm = args.pwm,
+
+    fragment_dist = FragmentSizes.open(args.sizes)
+
+    # set input_file/input_type based on whichever file is provided
+    if args.bam is not None:
+        input_file = args.bam
+        input_type = "bam"
+    elif args.fragments is not None:
+        input_file = args.fragments
+        input_type = "fragments"
+
+    params = NucParameters(vmat = vmat, fragmentsizes = fragment_dist,
+                           # refactored to take in the input file and
+                           # corresponding file type (BAM or fragments)
+                           input_file = input_file,
+                           input_type = input_type,
+                           fasta = args.fasta, pwm = args.pwm,
                            occ_track = args.occ_track,
                            sd = args.sd, nonredundant_sep = args.nuc_sep, redundant_sep = args.redundant_sep,
                            min_z = args.min_z, min_lr = args.min_lr , atac = args.atac)
+    
+    params.print_parameters()
+
     sets = chunks.split(items = args.cores*5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))
     if args.write_all:
@@ -181,6 +209,7 @@ def run_nuc(args):
         write_processes[i] = mp.Process(target = _writeFuncs[i], args=(write_queues[i], args.out))
         write_processes[i].start()
     for j in sets:
+        # _nucHelper executes the processing
         tmp = pool1.map(_nucHelper, zip(j,itertools.repeat(params)))
         for result in tmp:
             for i in outputs:

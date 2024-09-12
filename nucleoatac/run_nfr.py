@@ -73,23 +73,33 @@ def run_nfr(args):
     """run nfr calling
 
     """
+
     if args.bam is None and args.ins_track is None:
         raise Exception("Must supply either bam file or insertion track")
+    
     if not args.out:
         args.out = '.'.join(os.path.basename(args.calls).split('.')[0:-3])
+        
     if args.fasta is not None:
         chrs_fasta = read_chrom_sizes_from_fasta(args.fasta)
         pwm = PWM.open(args.pwm)
         chunks = ChunkList.read(args.bed, chromDict = chrs_fasta, min_offset = max(pwm.up, pwm.down))
     else:
         chunks = ChunkList.read(args.bed)
+
     if args.bam is not None:
         chrs_bam = read_chrom_sizes_from_bam(args.bam)
         chunks.checkChroms(chrs_bam, chrom_source = "BAM file") 
+
     chunks.merge()
+
     maxQueueSize = args.cores * 10 
+
     params = NFRParameters(args.occ_track, args.calls, args.ins_track, args.bam, max_occ = args.max_occ, max_occ_upper = args.max_occ_upper,
                             fasta = args.fasta, pwm = args.pwm)
+    
+    params.print_parameters()
+
     sets = chunks.split(items = args.cores * 5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))
     nfr_handle = open(args.out + '.nfrpos.bed','w')
@@ -97,12 +107,14 @@ def run_nfr(args):
     nfr_queue = mp.JoinableQueue()
     nfr_process = mp.Process(target = _writeNFR, args=(nfr_queue, args.out))
     nfr_process.start()
+
     if params.ins_track is None:
         ins_handle = open(args.out + '.ins.bedgraph','w')
         ins_handle.close()
         ins_queue = mp.JoinableQueue()
         ins_process = mp.Process(target = _writeIns, args=(ins_queue, args.out))
         ins_process.start()
+
     for j in sets:
         tmp = pool1.map(_nfrHelper, zip(j,itertools.repeat(params)))
         for result in tmp:
@@ -111,6 +123,7 @@ def run_nfr(args):
                 ins_queue.put(result[1])
             else:
                 nfr_queue.put(result)
+
     pool1.close()
     pool1.join()
     nfr_queue.put('STOP')
@@ -118,9 +131,12 @@ def run_nfr(args):
     if params.ins_track is None:
         ins_queue.put('STOP')
         ins_process.join()
+
     pysam.tabix_compress(args.out + '.nfrpos.bed', args.out + '.nfrpos.bed.gz',force = True)
     shell_command('rm ' + args.out + '.nfrpos.bed')
+
     pysam.tabix_index(args.out + '.nfrpos.bed.gz', preset = "bed", force = True)
+
     if params.ins_track is None:
         pysam.tabix_compress(args.out + '.ins.bedgraph', args.out + '.ins.bedgraph.gz', force = True)
         shell_command('rm ' + args.out + '.ins.bedgraph')
