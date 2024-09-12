@@ -90,6 +90,7 @@ class InsertionBiasTrack(Track):
         self.vals = signal.correlate(seqmat,np.log(pwm.mat),mode='valid')[0]
         self.start += pwm.up
         self.end -= pwm.down
+
     def get(self, start = None, end = None, pos = None, log = None):
         """Obtain values for particular region"""
         out = Track.get(self, start, end, pos)
@@ -105,6 +106,7 @@ class InsertionBiasTrack(Track):
                 return np.exp(out)
             else:
                 return out
+            
     def getLocalbias(self, windowlen = 55, window = "flat"):
         """Make bias a reflection of score in a given window"""
         if self.log:

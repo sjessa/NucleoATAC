@@ -214,6 +214,23 @@ class OccupancyParameters:
         self.step = step
         self.halfstep = (self.step-1) / 2
 
+
+    def print_parameters(self):
+        """Prints the parameters of the OccupancyParameters class."""
+        print "OccupancyParameters:"
+        print "  sep: %d" % self.sep
+        print "  fasta: %s" % self.fasta
+        print "  pwm file: %s" % self.pwm
+        print "  window size: %d" % self.window
+        print "  min_occ: %f" % self.min_occ
+        print "  flank: %d" % self.flank
+        print "  input_file: %s" % self.input_file
+        print "  input_type: %s" % self.input_type
+        print "  upper: %d" % self.upper
+        print "  occ_calc_params: %s" % str(self.occ_calc_params)
+        print "  step: %d" % self.step
+        print "  halfstep: %d" % self.halfstep
+
 class OccChunk(Chunk):
     """Class for calculating occupancy and occupancy peaks
     """

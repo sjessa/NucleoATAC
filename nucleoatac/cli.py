@@ -32,27 +32,38 @@ def nucleoatac_main(args):
         print('---------Calling NFR positions--------------------------------------------------')
         run_nfr(args)
     elif call == "run":
-        # modified to take fragments file as input instead of BAM
-        occ_args = parser.parse_args(map(str,['occ','--bed',args.bed,
+
+        occ_args = parser.parse_args(map(str,['occ','--bed', args.bed,
                                             '--bam', args.bam,
                                             '--fragments', args.fragments,
                                             '--fasta', args.fasta, '--pwm', args.pwm,
                                             '--chroms_keep', args.chroms_keep,
-                                            '--out',args.out,'--cores',args.cores]))
+                                            '--out',args.out,
+                                            '--cores', args.cores]))
+        
         vprocess_args = parser.parse_args(['vprocess','--sizes',args.out+'.nuc_dist.txt','--out',args.out])
-        nuc_args_list = ['nuc','--bed',args.bed,'--bam',args.bam,
+
+        nuc_args_list = ['nuc','--bed', args.bed,
+                         '--fasta', args.fasta, 
+                         '--bam',args.bam,
                          '--fragments',args.fragments,
                          '--out',args.out,'--cores', str(args.cores),
+                         '--chroms_keep', args.chroms_keep,
                         '--occ_track', args.out + '.occ.bedgraph.gz','--vmat', args.out + '.VMat',
                         '--fasta', args.fasta, '--pwm', args.pwm, '--sizes', args.out + '.fragmentsizes.txt']
+        
         if args.write_all:
             nuc_args_list.extend(['--write_all'])
+
         nuc_args = parser.parse_args(nuc_args_list)
+
         merge_args = parser.parse_args(['merge','--occpeaks',args.out +'.occpeaks.bed.gz','--nucpos',args.out+'.nucpos.bed.gz',
                                         '--out',args.out])
+        
         nfr_args = parser.parse_args(['nfr','--bed', args.bed, '--occ_track', args.out + '.occ.bedgraph.gz', '--calls', 
                                         args.out + '.nucmap_combined.bed.gz','--out',args.out, '--fasta', args.fasta, 
                                         '--pwm', args.pwm , '--bam', args.bam])
+        
         from nucleoatac.run_occ import run_occ
         from nucleoatac.run_vprocess import run_vprocess
         from nucleoatac.run_nuc import run_nuc
@@ -79,6 +90,7 @@ def nucleoatac_parser():
     argparser = argparse.ArgumentParser(description = "%(prog)s -- Nucleosome Calling for ATAC-Seq",
                                         epilog = "For command line options for each command, type %(prog)s COMMAND -h")
     argparser.add_argument("--version", action="version", version="%(prog)s "+__version__)
+
     subparsers = argparser.add_subparsers(dest = 'call' )
 
     add_run_parser( subparsers)
@@ -109,8 +121,8 @@ def add_occ_parser( subparsers):
     
     # modified to take in BAM or fragments file
     group0 = parser.add_mutually_exclusive_group(required=True)
-    group0.add_argument('--bam', metavar='bam_file', help = 'Aligned reads', type=str)
-    group0.add_argument('--fragments', metavar='frag_file', help = 'Sorted fragments file, compressed and with tabix saved index as filename.tbi', type=str)
+    group0.add_argument('--bam', metavar='bam_file', help = 'Aligned reads', type=str, default = None)
+    group0.add_argument('--fragments', metavar='frag_file', help = 'Sorted fragments file, compressed and with tabix saved index as filename.tbi', type=str, default = None)
 
     group4 = parser.add_argument_group("Bias calculation information","Highly recommended.")
     group4.add_argument('--pwm', metavar = 'Tn5_PWM', help = "PWM descriptor file. Default is Human.PWM.txt included in package", default = "Human")
@@ -167,9 +179,12 @@ def add_nfr_parser( subparsers):
     group6 = parser.add_argument_group("Insertion track options","Either input insertion track or bamfile")
     group6.add_argument('--ins_track', metavar = 'ins_file', 
                         help = "bgzip compressed, tabix-indexed bedgraph file with insertion track. will be generated if not included")
-    # TODO: add option for fragments file input
-    group6.add_argument('--bam', metavar='bam_file',
-                    help = 'Sorted (and indexed) BAM file')
+
+    # modified to take in BAM or fragments file
+    group0 = parser.add_mutually_exclusive_group(required=True)
+    group0.add_argument('--bam', metavar='bam_file', help = 'Aligned reads', type=str, default = None)
+    group0.add_argument('--fragments', metavar='frag_file', help = 'Sorted fragments file, compressed and with tabix saved index as filename.tbi', type=str, default = None)
+
     group4 = parser.add_argument_group("Bias calculation information","Highly recommended. If fasta is not provided, will not calculate bias")
     group4.add_argument('--fasta', metavar = 'genome_seq',
                     help = 'Indexed fasta file')
@@ -220,26 +235,34 @@ def add_nuc_parser( subparsers):
     group1.add_argument('--bed', metavar='bed_file' , help = 'Regions for which \
         to do stuff.', required=True)
     group1.add_argument('--vmat', metavar='vdensity_file', help = "VMat object", required=True)
-    # TODO: add option for fragments file input
-    group1.add_argument('--bam', metavar='bam_file',
-                    help = 'Accepts sorted BAM file', required=True)
     group1.add_argument('--out', metavar='basename',
                     help="give output basename", required = True)
-    group2 = parser.add_argument_group('Bias options',"If --fasta not provided, bias not calculated")
-    group2.add_argument('--fasta', metavar = 'genome_seq',
-                    help = 'Indexed fasta file')
-    group2.add_argument('--pwm', metavar = 'Tn5_PWM', help = "PWM descriptor file. Default is Human.PWM.txt included in package", default = "Human")
-    group3 = parser.add_argument_group('General options', '')
-    group3.add_argument('--sizes', metavar = 'fragmentsizes_file',
+    group1.add_argument('--fasta', metavar = 'genome_seq',
+                    help = 'Indexed fasta file', required=True)
+    group1.add_argument('--sizes', metavar = 'fragmentsizes_file',
                        help = "File with fragment size distribution.  Use if don't want calculation of fragment size")
+
+
+    # modified to take in BAM or fragments file
+    group0 = parser.add_mutually_exclusive_group(required=True)
+    group0.add_argument('--bam', metavar='bam_file', help = 'Aligned reads', type=str)
+    group0.add_argument('--fragments', metavar='frag_file', help = 'Sorted fragments file, compressed and with tabix saved index as filename.tbi', type=str)
+
+    group2 = parser.add_argument_group('Bias options')
+    group2.add_argument('--pwm', metavar = 'Tn5_PWM', help = "PWM descriptor file. Default is Human.PWM.txt included in package", default = "Human")
+
+    group3 = parser.add_argument_group('General options', '')
     group3.add_argument('--occ_track', metavar = 'occ_file',
                        help = "bgzip compressed, tabix-indexed bedgraph file with occcupancy track. Otherwise occ not determined for nuc positions.")
     group3.add_argument('--cores', metavar = 'num_cores',default=1,
                     help='Number of cores to use',type=int)
+    group3.add_argument('--chroms_keep', metavar = 'chroms_keep', default = None,
+                        help = "Comma separated list of chromosomes to restrict analysis to. Default is to use all.")
     group3.add_argument('--write_all', action="store_true", default = False,
                     help="write all tracks")
     group3.add_argument('--not_atac', dest = "atac",  action="store_false", default = True,
                     help="data is not atac-seq")
+    
     group5 = parser.add_argument_group('Nucleosome calling parameters','Change with caution')
     group5.add_argument('--min_z', metavar='float', default = 3,
         help = 'Z-score threshold for nucleosome calls. Default is 3', type = float)
@@ -264,18 +287,24 @@ def add_run_parser( subparsers):
     group1 = parser.add_argument_group('Required', 'Necessary arguments')
     group1.add_argument('--bed', metavar='bed_file' , help = 'Regions for which \
         to do stuff.', required=True)
-    # TODO: add option for fragments file input
-    group1.add_argument('--bam', metavar='bam_file',
-                    help = 'Accepts sorted BAM file', required=True)
     group1.add_argument('--out', metavar='output_basename',
                     help="give output basename", required=True)
     group1.add_argument('--fasta', metavar = 'genome_seq',
                     help = 'Indexed fasta file', required=True)
+    
+    # modified to take in BAM or fragments file
+    group0 = parser.add_mutually_exclusive_group(required=True)
+    group0.add_argument('--bam', metavar='bam_file', help = 'Aligned reads', type=str, default=None)
+    group0.add_argument('--fragments', metavar='frag_file', help = 'Sorted fragments file, compressed and with tabix saved index as filename.tbi', type=str, default=None)
+
     group4 = parser.add_argument_group("Bias calculation parameters","")
     group4.add_argument('--pwm', metavar = 'Tn5_PWM', help = "PWM descriptor file. Default is Human.PWM.txt included in package", default = "Human")
+
     group3 = parser.add_argument_group('General options', '')
     group3.add_argument('--cores', metavar = 'num_cores',default=1,
                     help='Number of cores to use',type=int)
+    group3.add_argument('--chroms_keep', metavar = 'chroms_keep', default = None,
+                    help = "Comma separated list of chromosomes to restrict analysis to. Default is to use all.")
     group3.add_argument('--write_all', action="store_true", default = False,
                     help="write all tracks")
     return

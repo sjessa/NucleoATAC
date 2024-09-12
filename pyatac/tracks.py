@@ -11,6 +11,7 @@ from pyatac.chunk import Chunk
 from pyatac.utils import smooth
 import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()})
 from fragments import getInsertions, getStrandedInsertions
+from nucleoatac.fragments_handling import getInsertionsFromFragments
 from pyatac.seq import get_sequence, seq_to_mat, complement
 
 class Track(Chunk):
@@ -159,19 +160,31 @@ class Track(Chunk):
 
 class InsertionTrack(Track):
     """Class for getting and storing insertion positions"""
+
     def __init__(self, chrom, start, end):
         Track.__init__(self, chrom, start, end, "insertions")
-    def calculateInsertions(self, bamfile, flank = 0, lower = 0, upper = 2000, atac = True):
-        """Compute inserion track"""
+
+    def calculateInsertions(self, input_file, input_type, flank = 0, lower = 0, upper = 2000, atac = True):
+        """
+        Compute inserion track.
+        Modified to take input_type as an argument, to allow for the use of
+        fragment files as input instead of BAM.
+        """
         self.start = self.start - flank
         self.end = self.end + flank
-        self.vals = getInsertions(bamfile, self.chrom, self.start, self.end, lower, upper, atac)
+
+        if input_type == "bam":
+            self.vals = getInsertions(input_file, self.chrom, self.start, self.end, lower, upper, atac)
+        elif input_type == "fragments":
+            self.vals = getInsertionsFromFragments(input_file, self.chrom, self.start, self.end, lower, upper)
+
     def calculateStrandedInsertions(self, bamfile, flank =0, lower = 0, upper = 2000, atac = True):
         """Compute inserion track for plus and minus strands separately"""
         self.start = self.start - flank
         self.end = self.end + flank
         self.plus, self.minus = getStrandedInsertions(bamfile, self.chrom, self.start, self.end, lower, upper, atac)
         self.vals = self.plus + self.minus
+
     def getInsertionSequences(self, fasta, nucleotides = ["C","G","A","T"], up = 10, down = 10):
         """Get sequence content at insertions"""
         mat = np.zeros((len(nucleotides), up + down +1))
@@ -184,6 +197,7 @@ class InsertionTrack(Track):
         for i in range(self.length()):
             mat += self.vals[i] * seq_mat[:,(offset + i - up):(offset + i + down + 1)]
         return mat
+    
     def getStrandedInsertionSequences(self, fasta, nucleotides = ["C","G","A","T"], up = 10, down = 10):
         """Get sequence content at insertions, taking into account strand"""
         mat = np.zeros((len(nucleotides), up + down +1))
@@ -204,8 +218,10 @@ class InsertionTrack(Track):
 
 class CoverageTrack(Track):
     """Class for computing read center converage"""
+
     def __init__(self, chrom, start, end):
         Track.__init__(self, chrom, start, end, "coverage")
+
     def calculateCoverage(self, mat, lower, upper, window_len):
         """Compute coverage of fragment centers using flat window"""
         offset=self.start-mat.start-(window_len/2)
@@ -220,6 +236,7 @@ class CoverageTrack(Track):
             collapsed = np.sum(mat.mat[lower:upper,],axis=0)
         self.vals = smooth(collapsed, window_len, window="flat",
                             mode='valid',norm=False)
+        
     def calculateCoverageSmooth(self,mat,lower,upper,window_len,sd):
         """Compute coverage of fragment centers using gaussia window"""
         offset=self.start-mat.start-(window_len/2)

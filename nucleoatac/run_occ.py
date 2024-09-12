@@ -159,6 +159,8 @@ def run_occ(args):
                                  input_type = input_type,
                                  ci = args.confidence_interval, step = args.step)
     
+    params.print_parameters()
+    
     print "@ calculating occupancy..."
     sets = chunks.split(items = args.cores * 5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))

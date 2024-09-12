@@ -140,7 +140,7 @@ class FragmentMat2D(ChunkMat2D):
         if input_type == "bam":
             self.mat = makeFragmentMat(input_file, self.chrom, self.start, self.end, self.lower, self.upper, self.atac)
         elif input_type == "fragments":
-            self.mat = makeFragmentMatFromFragments(input_file, self.chrom, self.start, self.end, self.lower, self.upper, self.atac)
+            self.mat = makeFragmentMatFromFragments(input_file, self.chrom, self.start, self.end, self.lower, self.upper)
 
 
 class BiasMat2D(ChunkMat2D):

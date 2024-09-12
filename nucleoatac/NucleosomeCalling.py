@@ -13,7 +13,7 @@ from nucleoatac.multinomial_cov import calculateCov
 from nucleoatac.Occupancy import OccupancyTrack
 from pyatac.tracks import Track, CoverageTrack
 from pyatac.chunk import Chunk
-from pyatac.utils import call_peaks, reduce_peaks, read_chrom_sizes_from_bam
+from pyatac.utils import call_peaks, reduce_peaks,read_chrom_sizes_from_fasta
 from pyatac.chunkmat2d import FragmentMat2D, BiasMat2D
 from pyatac.bias import InsertionBiasTrack, PWM
 
@@ -203,7 +203,7 @@ class Nucleosome(Chunk):
 
 class NucParameters:
     """Class for storing parameters related to nucleosome calling"""
-    def __init__(self, vmat, fragmentsizes, bam, fasta, pwm,
+    def __init__(self, vmat, fragmentsizes, input_file, input_type, fasta, pwm,
                  occ_track = None, atac = True,
                  sd = 25, nonredundant_sep = 120, redundant_sep = 25,
                  min_z = 3, min_lr = 0, min_reads = 1):
@@ -213,6 +213,8 @@ class NucParameters:
         self.upper= vmat.upper
         self.window = vmat.mat.shape[1]
         self.fragmentsizes= fragmentsizes
+        self.input_file = input_file # either BAM or fragments file
+        self.input_type = input_type # either "bam" or "fragments"
         self.min_reads = min_reads
         self.min_z = min_z
         self.min_lr = min_lr
@@ -221,9 +223,29 @@ class NucParameters:
         self.nonredundant_sep = nonredundant_sep
         self.fasta = fasta
         self.pwm = PWM.open(pwm)
-        self.chrs = read_chrom_sizes_from_bam(bam)
-        self.bam = bam
+        self.chrs = read_chrom_sizes_from_fasta(fasta)
         self.occ_track = occ_track
+
+    def print_parameters(self):
+        """Prints the parameters of the NucParameters class."""
+        print "NucParameters:"
+        print "  atac: %s" % self.atac
+        print "  vmat lower bound: %d" % self.lower
+        print "  vmat upper bound: %d" % self.upper
+        print "  vmat window size: %d" % self.window
+        
+        print "  fragmentsizes: %s" % str(self.fragmentsizes)
+        print "  input_file: %s" % self.input_file
+        print "  input_type: %s" % self.input_type
+        print "  min_reads: %d" % self.min_reads
+        print "  min_z: %f" % self.min_z
+        print "  min_lr: %f" % self.min_lr
+        print "  smooth_sd: %d" % self.smooth_sd
+        print "  redundant_sep: %d" % self.redundant_sep
+        print "  nonredundant_sep: %d" % self.nonredundant_sep
+        print "  fasta: %s" % self.fasta
+        print "  pwm file: %s" % self.pwm
+        print "  occ_track: %s" % self.occ_track
 
 
 
@@ -234,12 +256,16 @@ class NucChunk(Chunk):
         self.start = chunk.start
         self.end = chunk.end
         self.chrom = chunk.chrom
+
     def initialize(self, parameters):
         self.params = parameters
+
     def getFragmentMat(self):
+        # modified to take in either BAM or fragments file as input
         self.mat = FragmentMat2D(self.chrom, self.start - max(self.params.window,self.params.upper/2+1),
                                  self.end + max(self.params.window,self.params.upper/2+1), 0, self.params.upper, atac = self.params.atac)
-        self.mat.makeFragmentMat(self.params.bam)
+        self.mat.makeFragmentMat(self.params.input_file, self.params.input_type)
+
     def makeBiasMat(self):
         self.bias_mat = BiasMat2D(self.chrom, self.start - self.params.window,
                                  self.end + self.params.window, 0, self.params.upper)
@@ -252,6 +278,7 @@ class NucChunk(Chunk):
                                  self.end + self.params.window, 0, self.params.upper)
         self.bias_mat_prenorm.mat = copy(self.bias_mat.mat)
         self.bias_mat.normByInsertDist(self.params.fragmentsizes)
+
     def getNucSignal(self):
         """Gets Nucleosome Signal Track"""
         self.nuc_cov = CoverageTrack(self.chrom, self.start,
@@ -266,11 +293,13 @@ class NucChunk(Chunk):
         self.nuc_signal.calculateSignal(self.mat, self.params.vmat)
         self.norm_signal = NormSignalTrack(self.chrom, self.start, self.end)
         self.norm_signal.calculateNormSignal(self.nuc_signal,self.bias)
+
     def getNFR(self):
         """get number of reads of sub-nucleosomal length"""
         self.nfr_cov = CoverageTrack(self.chrom, self.start, self.end)
         self.nfr_cov.calculateCoverage(self.mat, 0, self.params.lower,
                                                         self.params.window)
+        
     def smoothSignal(self):
         """Smooth thenormalized signal track"""
         window_len = 6 * self.params.smooth_sd + 1
@@ -281,6 +310,7 @@ class NucChunk(Chunk):
         self.smoothed.smooth_track(window_len, window = "gaussian",
                              sd = self.params.smooth_sd, mode = 'same',
                              norm = True)
+        
     def getOcc(self):
         """gets occupancy track-- either reads in from bw handle given, or makes new"""
         self.occ = Track(self.chrom,self.start,self.end,"Occupancy")
@@ -291,10 +321,12 @@ class NucChunk(Chunk):
         upper_file = self.params.occ_track[:-11] + 'upper_bound.bedgraph.gz'
         self.occ_upper = Track(self.chrom,self.start,self.end,"Occupancy")
         self.occ_upper.read_track(upper_file)
+
     def findAllNucs(self):
         """Find peaks in data"""
         self.nuc_collection = {}
         combined = self.norm_signal.vals + self.smoothed.vals
+
         #find peaks in normalized sigal
         cands1 = call_peaks(combined, min_signal = 0,
                                 sep = self.params.redundant_sep,
@@ -313,6 +345,7 @@ class NucChunk(Chunk):
                                             map(lambda x: self.nuc_collection[x].z, self.sorted_nuc_keys),
                                                 self.params.nonredundant_sep)
         self.redundant = np.setdiff1d(self.sorted_nuc_keys, self.nonredundant)
+
     def fit(self):
         x = np.linspace(0,self.length() -1, self.length())
         fit = np.zeros(self.length())
@@ -322,9 +355,11 @@ class NucChunk(Chunk):
         self.fitted = Track(self.chrom, self.start, self.end,
                             "Fitted Nucleosome Signal")
         self.fitted.assign_track(fit)
+
     def makeInsertionTrack(self):
         """make insertion track for chunk"""
         self.ins = self.mat.getIns()
+
     def process(self, params):
         """wrapper to carry out all methods needed to call nucleosomes and nfrs"""
         self.initialize(params)
@@ -338,6 +373,7 @@ class NucChunk(Chunk):
         self.findAllNucs()
         self.fit()
         self.makeInsertionTrack()
+
     def removeData(self):
         """remove data from chunk-- deletes all attributes"""
         names = self.__dict__.keys()
