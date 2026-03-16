@@ -21,5 +21,8 @@
 example/test_example*
 example/test_results/*
 
+#regression test output (regenerated each run)
+tests/py3_regression_output/
+
 CLAUDE.md
 PLAN.md
