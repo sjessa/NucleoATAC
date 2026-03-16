@@ -28,7 +28,7 @@ def getAllFragmentSizesFromFragsFile(fragments, lower, upper):
     """
 
     # initialize an array to hold the size counts within the specified range
-    sizes = np.zeros(upper - lower, dtype=np.float)
+    sizes = np.zeros(upper - lower, dtype=np.float64)
 
     # open tabix-indexed frags file
     tbx = pysam.TabixFile(fragments)
@@ -70,7 +70,7 @@ def getAllFragmentSizesFromFragsFileFromChunkList(chunks, fragments, lower, uppe
     """
     
     # initialize an array to hold the size counts within the specified range
-    sizes = np.zeros(upper - lower, dtype=np.float)
+    sizes = np.zeros(upper - lower, dtype=np.float64)
 
     # open the tabix-indexed fragments file using pysam
     tbx = pysam.TabixFile(fragments)
@@ -89,7 +89,7 @@ def getAllFragmentSizesFromFragsFileFromChunkList(chunks, fragments, lower, uppe
             ilen = fragment_end - fragment_start
 
             # calculate the center of the fragment
-            center = fragment_start + (ilen - 1) / 2
+            center = fragment_start + (ilen - 1) // 2
 
             # check if fragment size is within the specified bounds and if the center is within the chunk
             if lower <= ilen < upper and chunk.start <= center < chunk.end:
@@ -127,7 +127,7 @@ def makeFragmentMatFromFragments(fragments, chrom, start, end, lower, upper):
     # init matrix
     nrow = upper - lower
     ncol = end - start
-    mat = np.zeros((nrow, ncol), dtype=np.float)
+    mat = np.zeros((nrow, ncol), dtype=np.float64)
 
     # open tabix-indexed file
     tbx = pysam.TabixFile(fragments)
@@ -181,7 +181,7 @@ def getInsertionsFromFragments(fragments, chrom, start, end, lower = 0, upper = 
 
     # initialize an array to hold the insertion counts within the specified region
     npos = end - start
-    mat = np.zeros(npos, dtype=np.float)
+    mat = np.zeros(npos, dtype=np.float64)
 
     # open the tabix-indexed fragments file using pysam
     tbx = pysam.TabixFile(fragments)

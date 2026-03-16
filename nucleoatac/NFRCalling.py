@@ -52,18 +52,18 @@ class NFRParameters:
 
     def print_parameters(self):
         """Prints the parameters of the NFRParameters class."""
-        print "NFRParameters:"
-        print "  input_file: %s" % self.input_file
-        print "  input_type: %s" % self.input_type
-        print "  ins_track: %s" % self.ins_track
-        print "  occ_track: %s" % self.occ_track
-        print "  calls: %s" % self.calls
-        print "  max_occ: %f" % self.max_occ
-        print "  max_occ_upper: %f" % self.max_occ_upper
-        print "  fasta: %s" % self.fasta
+        print("NFRParameters:")
+        print("  input_file: %s" % self.input_file)
+        print("  input_type: %s" % self.input_type)
+        print("  ins_track: %s" % self.ins_track)
+        print("  occ_track: %s" % self.occ_track)
+        print("  calls: %s" % self.calls)
+        print("  max_occ: %f" % self.max_occ)
+        print("  max_occ_upper: %f" % self.max_occ_upper)
+        print("  fasta: %s" % self.fasta)
         if self.fasta is not None:
-            print "  pwm file: %s" % self.pwm
-            print "  chromosomes: %s" % str(self.chrs)
+            print("  pwm file: %s" % self.pwm)
+            print("  chromosomes: %s" % str(self.chrs))
   
 
 
@@ -116,7 +116,7 @@ class NFRChunk(Chunk):
         if self.chrom in tbx.contigs:
             for row in tbx.fetch(self.chrom, self.start, self.end, parser = pysam.asTuple()):
                 nucs.append(int(row[1]))
-        for j in xrange(1,len(nucs)):
+        for j in range(1,len(nucs)):
             left = nucs[j-1] + 73
             right = nucs[j] - 72
             if right <= left:
@@ -136,7 +136,7 @@ class NFRChunk(Chunk):
         
     def removeData(self):
         """remove data from chunk-- deletes all attributes"""
-        names = self.__dict__.keys()
+        names = list(self.__dict__.keys())
         for name in names:
             delattr(self,name)
 

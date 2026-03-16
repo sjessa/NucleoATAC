@@ -48,7 +48,7 @@ def _writeOcc(track_queue, out):
             track.write_track(out_handle2, vals = track.smoothed_lower)
             track.write_track(out_handle3, vals = track.smoothed_upper)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing occupancy track\n')
         traceback.print_exc()
         print()
@@ -66,7 +66,7 @@ def _writePeaks(pos_queue, out):
             for pos in poslist:
                 pos.write(out_handle)
             pos_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing occupancy track\n')
         traceback.print_exc()
         print()
@@ -89,18 +89,18 @@ def run_occ(args):
     if args.chroms_keep is not None:
         # parse comma separated list of chromosomes
         chroms_keep = args.chroms_keep.split(',')
-        print "@ NOTE: restricting analysis to chromosomes: " + ", ".join(chroms_keep)
+        print("@ NOTE: restricting analysis to chromosomes: " + ", ".join(chroms_keep))
     else:
         chroms_keep = None
 
     # process peaks into chunks
-    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = args.flank + args.upper/2 + max(pwm.up,pwm.down) + args.nuc_sep/2, chroms_keep = chroms_keep)
-    chunks.slop(chrs, up = args.nuc_sep/2, down = args.nuc_sep/2)
+    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = args.flank + args.upper//2 + max(pwm.up,pwm.down) + args.nuc_sep//2, chroms_keep = chroms_keep)
+    chunks.slop(chrs, up = args.nuc_sep//2, down = args.nuc_sep//2)
     chunks.merge()
     maxQueueSize = args.cores*10
     fragment_dist = FragmentMixDistribution(0, upper = args.upper)
 
-    print "@ calculating fragment sizes..."
+    print("@ calculating fragment sizes...")
 
     # if sizes are provided, use them
     if args.sizes is not None:
@@ -137,7 +137,7 @@ def run_occ(args):
     # fig.savefig(args.out+'.fragmentsizes_widerange.pdf')
     # plt.close(fig)
 
-    print "@ fitting fragment size distribution..."
+    print("@ fitting fragment size distribution...")
     fragment_dist.modelNFR()
     fragment_dist.plotFits(args.out + '.occ_fit.pdf')
     fragment_dist.fragmentsizes.save(args.out + '.fragmentsizes.txt')
@@ -161,7 +161,7 @@ def run_occ(args):
     
     params.print_parameters()
     
-    print "@ calculating occupancy..."
+    print("@ calculating occupancy...")
     sets = chunks.split(items = args.cores * 5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))
     out_handle1 = open(args.out + '.occ.bedgraph','w')
@@ -196,7 +196,7 @@ def run_occ(args):
     write_process.join()
     peaks_process.join()
 
-    print "@ compressing and indexing output files..."
+    print("@ compressing and indexing output files...")
     pysam.tabix_compress(args.out + '.occpeaks.bed', args.out + '.occpeaks.bed.gz',force = True)
     shell_command('rm ' + args.out + '.occpeaks.bed')
     pysam.tabix_index(args.out + '.occpeaks.bed.gz', preset = "bed", force = True)
@@ -208,7 +208,7 @@ def run_occ(args):
     dist_out = FragmentSizes(0, args.upper, vals = nuc_dist)
     dist_out.save(args.out + '.nuc_dist.txt')
 
-    print "@ making figure"
+    print("@ making figure")
     #make figure
     fig = plt.figure()
     plt.plot(range(0,args.upper),dist_out.get(0,args.upper),label = "Nucleosome Distribution")
@@ -219,7 +219,7 @@ def run_occ(args):
     fig.savefig(args.out+'.nuc_dist.pdf')
     plt.close(fig)
 
-    print "@ done."
+    print("@ done.")
 
 
 

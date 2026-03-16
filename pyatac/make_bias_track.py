@@ -36,7 +36,7 @@ def _writeBias(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing insertion track\n')
         traceback.print_exc()
         print()
@@ -63,7 +63,7 @@ def make_bias_track(args, bases = 500000, splitsize = 1000):
     params = _BiasParams(args.fasta, args.pwm)
     if args.bed is None:
         chunks = ChunkList.convertChromSizes(params.chrs, splitsize = splitsize)
-        sets = chunks.split(items = bases/splitsize)
+        sets = chunks.split(items = bases//splitsize)
     else:
         chunks = ChunkList.read(args.bed)
         chunks.checkChroms(params.chrs.keys())

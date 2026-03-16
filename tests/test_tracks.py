@@ -16,9 +16,9 @@ class Test_Ins(TestCase):
     def test_ins_methods(self):
         """test that two methods for getting insertion track give same result"""
         ins1 = InsertionTrack(self.chunk.chrom, self.chunk.start, self.chunk.end)
-        ins1.calculateInsertions('example/single_read.bam')
+        ins1.calculateInsertions('example/single_read.bam', 'bam')
         mat = FragmentMat2D(self.chunk.chrom,self.chunk.start,self.chunk.end,0,100)
-        mat.makeFragmentMat('example/single_read.bam')
+        mat.makeFragmentMat('example/single_read.bam', 'bam')
         ins2 = mat.getIns()
         self.assertTrue(np.array_equal(ins1.get(self.chunk.start+100,self.chunk.start+300),ins2.get(self.chunk.start+100,self.chunk.start+300)))
 

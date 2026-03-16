@@ -5,13 +5,12 @@ Created on Mon May 12 14:40:53 2014
 @author: alicia
 """
 
-from __future__ import division
 import numpy as np
 cimport numpy as np
 cimport cython
 
 
-DTYPE = np.float
+DTYPE = np.float64
 ctypedef np.float_t DTYPE_t
 
 

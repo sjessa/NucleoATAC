@@ -22,7 +22,7 @@ class NucleoATACTestCase(TestCase):
         args = self.parser.parse_args(cmd.split()[1:])
         nucleoatac_main(args)
     def test_nuc(self):
-        cmd = "nucleoatac nuc --bam example/example.bam --bed example/example.bed --fasta example/sacCer3.fa --out example/test_results/test --vmat example/example_results/example.VMat --cores 2" 
+        cmd = "nucleoatac nuc --bam example/example.bam --bed example/example.bed --fasta example/sacCer3.fa --out example/test_results/test --vmat example/example_results/example.VMat --sizes example/example_results/example.fragmentsizes.txt --cores 2"
         args = self.parser.parse_args(cmd.split()[1:])
         nucleoatac_main(args)
     def test_merge(self):

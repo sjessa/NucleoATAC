@@ -45,7 +45,7 @@ def _writeNFR(pos_queue, out):
             for pos in poslist:
                 pos.write(out_handle)
             pos_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing occupancy track\n')
         traceback.print_exc()
         print()
@@ -59,7 +59,7 @@ def _writeIns(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing insertion track\n')
         traceback.print_exc()
         print()
@@ -74,8 +74,8 @@ def run_nfr(args):
 
     """
 
-    if args.bam is None and args.ins_track is None:
-        raise Exception("Must supply either bam file or insertion track")
+    if args.bam is None and getattr(args, 'fragments', None) is None and args.ins_track is None:
+        raise Exception("Must supply either bam file, fragments file, or insertion track")
     
     if not args.out:
         args.out = '.'.join(os.path.basename(args.calls).split('.')[0:-3])
@@ -95,7 +95,19 @@ def run_nfr(args):
 
     maxQueueSize = args.cores * 10 
 
-    params = NFRParameters(args.occ_track, args.calls, args.ins_track, args.bam, max_occ = args.max_occ, max_occ_upper = args.max_occ_upper,
+    # Determine input_file and input_type based on which argument was provided
+    if args.bam is not None:
+        input_file = args.bam
+        input_type = "bam"
+    elif getattr(args, 'fragments', None) is not None:
+        input_file = args.fragments
+        input_type = "fragments"
+    else:
+        input_file = None
+        input_type = None
+
+    params = NFRParameters(args.occ_track, args.calls, args.ins_track, input_file = input_file, input_type = input_type,
+                            max_occ = args.max_occ, max_occ_upper = args.max_occ_upper,
                             fasta = args.fasta, pwm = args.pwm)
     
     params.print_parameters()

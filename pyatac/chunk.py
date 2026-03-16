@@ -7,6 +7,7 @@ General tools for dealing with ATAC-Seq data using Python.
 
 import gzip
 import warnings
+import functools
 
 class Chunk():
     """Class that stores reads for a particular chunk of the genome"""
@@ -40,10 +41,10 @@ class Chunk():
             self.end = newEnd
     def center(self, new = False):
         if self.strand == "-":
-            newEnd = self.end - (self.length()/2)
+            newEnd = self.end - (self.length()//2)
             newStart = newEnd - 1
         else:
-            newStart = self.start + (self.length()/2)
+            newStart = self.start + (self.length()//2)
             newEnd = newStart +1
         if new:
             out = Chunk(self.chrom, newStart, newEnd,
@@ -94,10 +95,10 @@ class ChunkList(list):
             raise ValueError("Expecting Chunk")
     def sort(self):
         """sort regions"""
-        list.sort(self, cmp = _chunkCompare)
+        list.sort(self, key=functools.cmp_to_key(_chunkCompare))
     def isSorted(self):
         """check that regions are sorted"""
-        return all([_chunkCompare(self[i],self[i+1])==-1 for i in xrange(len(self)-1)])
+        return all([_chunkCompare(self[i],self[i+1])==-1 for i in range(len(self)-1)])
     def slop(self, chromDict, up = 0, down = 0, new = False):
         out = ChunkList()
         for i in self:
@@ -150,7 +151,7 @@ class ChunkList(list):
         
         """
         if bedfile[-3:] == '.gz':
-            infile = gzip.open(bedfile,"r")
+            infile = gzip.open(bedfile,"rt")
         else:
             infile = open(bedfile,"r")
         out = ChunkList()
@@ -204,7 +205,7 @@ class ChunkList(list):
             out = ChunkList()
             for chrom in chrs:
                 out.extend(ChunkList(*(Chunk(chrom, i, min(i + splitsize, chromDict[chrom] - offset))
-                        for i in xrange(offset, chromDict[chrom] - offset, splitsize))))
+                        for i in range(offset, chromDict[chrom] - offset, splitsize))))
             return out
     def split(self, bases = None, items = None):
         """splits list of chunks into set of sublists"""
@@ -223,7 +224,7 @@ class ChunkList(list):
                 out.append(self[i:(k+1)])
             return out
         elif items is not None:
-            out = [ self[i:i+items] for i in xrange(0,len(self),items)]
+            out = [ self[i:i+items] for i in range(0,len(self),items)]
             return out
         else:
             raise Exception("Need to provide items or bases argument!")

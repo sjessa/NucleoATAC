@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 import matplotlib
-import nose
 matplotlib.use('agg')
 
-nose.main()
+import pytest
+import sys
+
+sys.exit(pytest.main(['-v', 'tests/']))

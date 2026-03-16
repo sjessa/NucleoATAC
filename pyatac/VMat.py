@@ -34,7 +34,7 @@ class VMat:
         self.mat = mat
         self.upper = upper
         self.lower = lower
-        self.w = mat.shape[1]/2
+        self.w = mat.shape[1]//2
     def trim(self,lower,upper,w):
         """reduce the size of the vplot
 
@@ -89,11 +89,11 @@ class VMat:
             raise Exception("Mode must be one of 'same' or 'valid'")
     def smooth(self, sd = 1):
         """smooth v-plot using gaussian kernel"""
-        self.mat = ndimage.filters.gaussian_filter(self.mat,sd,
+        self.mat = ndimage.gaussian_filter(self.mat,sd,
                                                           mode='constant')
     def smooth1d(self, sd = 1, axis = 1):
         """smooth v-plot along one axis only"""
-        self.mat = ndimage.filters.gaussian_filter1d(self.mat,sd,axis,
+        self.mat = ndimage.gaussian_filter1d(self.mat,sd,axis,
                                                           mode='nearest')
     def norm(self):
         """normalize v matrix so that signal minus even background will be 1 divided by base pairs in window"""
@@ -108,19 +108,19 @@ class VMat:
     def converto1d(self):
         """convert the 2d matrix to a 1d representation of insertions"""
         self.one_d = np.zeros(self.upper + self.upper%2 +2*self.w+1)
-        center = self.upper/2 + self.w
+        center = self.upper//2 + self.w
         for j in range(self.mat.shape[0]):
             for i in range(self.mat.shape[1]):
                 ilen=j+self.lower
                 val = copy(self.mat[j,i])
                 if ilen%2==0:
-                    self.one_d[center-(self.w-i)-(ilen/2)]+= val
-                    self.one_d[center-(self.w-i)+(ilen/2)]+= val
+                    self.one_d[center-(self.w-i)-(ilen//2)]+= val
+                    self.one_d[center-(self.w-i)+(ilen//2)]+= val
                 else:
-                    self.one_d[center-(self.w-i)-(ilen/2)]+= val * 0.5
-                    self.one_d[center-(self.w-i)+(ilen/2)]+= val * 0.5
-                    self.one_d[center-(self.w-i)-(ilen/2+1)]+= val * 0.5
-                    self.one_d[center-(self.w-i)+(ilen/2+1)]+= val * 0.5
+                    self.one_d[center-(self.w-i)-(ilen//2)]+= val * 0.5
+                    self.one_d[center-(self.w-i)+(ilen//2)]+= val * 0.5
+                    self.one_d[center-(self.w-i)-(ilen//2+1)]+= val * 0.5
+                    self.one_d[center-(self.w-i)+(ilen//2+1)]+= val * 0.5
         self.one_d = self.one_d / sum(self.one_d)
     def plot(self, mat=None, title=None, filename=None):
         """Plot current main matrix or specified matrix (of same dimensions)"""
@@ -145,7 +145,7 @@ class VMat:
     def plot_1d(self,filename=None):
         """plot the 1d insertion representation of the matrix"""
         fig = plt.figure()
-        xlim = len(self.one_d)/2
+        xlim = len(self.one_d)//2
         plt.plot(range(-xlim,xlim+1),self.one_d)
         plt.vlines(-73,0,max(self.one_d)*1.1,linestyles='dashed')
         plt.vlines(73,0,max(self.one_d)*1.1,linestyles='dashed')
@@ -208,7 +208,7 @@ class VMat:
             elif state == 'upper':
                 upper = int(line.strip('\n'))
             elif state == 'mat':
-                mat.append(map(float,line.strip('\n').split('\t')))
+                mat.append(list(map(float,line.strip('\n').split('\t'))))
         try:
             new = VMat(np.array(mat), lower, upper)
         except NameError:

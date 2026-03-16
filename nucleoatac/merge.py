@@ -36,7 +36,7 @@ class NucList(ChunkList):
     def read(bedfile, source, min_occ = 0):
         """Make a list of chunks from a tab-delimited bedfile"""
         if bedfile[-3:] == '.gz':
-            infile = gzip.open(bedfile,"r")
+            infile = gzip.open(bedfile,"rt")
         else:
             infile = open(bedfile,"r")
         out = NucList()
@@ -90,6 +90,78 @@ def merge(occ_peaks, nuc_calls, sep = 120):
         keep.append(occ_peaks[i])
         i += 1
     return keep
+
+def run_merge_chroms(args):
+    """Merge per-chromosome NucleoATAC output files.
+
+    Expects per-chromosome outputs named as <prefix>.<chrom>.<suffix>
+    and produces merged outputs named as <out>.<suffix>.
+    """
+    chroms = args.chroms.split(',')
+    prefix = args.prefix
+    out = args.out
+
+    # Determine which file suffixes to merge based on what exists
+    occ_suffixes = [
+        'occ.bedgraph.gz',
+        'occ.lower_bound.bedgraph.gz',
+        'occ.upper_bound.bedgraph.gz',
+        'occpeaks.bed.gz',
+        'fragmentsizes.txt',
+        'nuc_dist.txt',
+    ]
+    nuc_suffixes = [
+        'nucpos.bed.gz',
+        'nucpos.redundant.bed.gz',
+        'nucleoatac_signal.bedgraph.gz',
+        'nucleoatac_signal.smooth.bedgraph.gz',
+        'nucleoatac_background.bedgraph.gz',
+        'nucleoatac_raw.bedgraph.gz',
+    ]
+    all_suffixes = occ_suffixes + nuc_suffixes
+
+    for suffix in all_suffixes:
+        # Check if per-chrom files exist for this suffix
+        chrom_files = []
+        for chrom in chroms:
+            f = f"{prefix}.{chrom}.{suffix}"
+            if os.path.exists(f):
+                chrom_files.append(f)
+
+        if not chrom_files:
+            continue
+
+        out_file = f"{out}.{suffix}"
+
+        if suffix.endswith('.gz'):
+            # Concatenate compressed bedgraph/bed files:
+            # decompress, concatenate, recompress, reindex
+            uncompressed = out_file[:-3]  # remove .gz
+            with open(uncompressed, 'w') as out_handle:
+                for f in chrom_files:
+                    with gzip.open(f, 'rt') as in_handle:
+                        for line in in_handle:
+                            out_handle.write(line)
+            pysam.tabix_compress(uncompressed, out_file, force=True)
+            os.remove(uncompressed)
+            pysam.tabix_index(out_file, preset="bed", force=True)
+            print(f"  merged {len(chrom_files)} files -> {out_file}")
+        else:
+            # Plain text files (fragmentsizes, nuc_dist): just use first chrom's version
+            # since these are genome-wide summaries, not per-chrom
+            import shutil
+            shutil.copy2(chrom_files[0], out_file)
+            print(f"  copied {chrom_files[0]} -> {out_file}")
+
+    # Copy PDF files if they exist (from first chrom)
+    for suffix in ['fragmentsizes.pdf', 'occ_fit.pdf', 'nuc_dist.pdf']:
+        first = f"{prefix}.{chroms[0]}.{suffix}"
+        if os.path.exists(first):
+            import shutil
+            shutil.copy2(first, f"{out}.{suffix}")
+
+    print(f"merge-chroms complete: {len(chroms)} chromosomes merged to {out}.*")
+
 
 def run_merge(args):
     if not args.out:

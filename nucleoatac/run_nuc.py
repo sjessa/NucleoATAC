@@ -49,7 +49,7 @@ def _writeNucSig(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing NucleoATAC signal track\n')
         traceback.print_exc()
         print()
@@ -64,7 +64,7 @@ def _writeBackground(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing NucleoATAC background track\n')
         traceback.print_exc()
         print()
@@ -79,7 +79,7 @@ def _writeSmooth(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing smoothed NucleoATAC signal track\n')
         traceback.print_exc()
         print()
@@ -93,7 +93,7 @@ def _writeRaw(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing un-normalized NucleoATAC signal track\n')
         traceback.print_exc()
         print()
@@ -110,7 +110,7 @@ def _writeNucPos(pos_queue, out):
             for pos in poslist:
                 pos.write(out_handle)
             pos_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing nucleosome position file\n')
         traceback.print_exc()
         print()
@@ -125,7 +125,7 @@ def _writeNucPosRedundant(pos_queue, out):
             for pos in poslist:
                 pos.write(out_handle)
             pos_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing redundant nucleosome position file\n')
         traceback.print_exc()
         print()
@@ -158,12 +158,12 @@ def run_nuc(args):
     if args.chroms_keep is not None:
         # parse comma separated list of chromosomes
         chroms_keep = args.chroms_keep.split(',')
-        print "@ NOTE: restricting analysis to chromosomes: " + ", ".join(chroms_keep)
+        print("@ NOTE: restricting analysis to chromosomes: " + ", ".join(chroms_keep))
     else:
         chroms_keep = None
 
-    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = vmat.mat.shape[1] + vmat.upper/2 + max(pwm.up,pwm.down) + args.nuc_sep/2, min_length = args.nuc_sep * 2, chroms_keep = chroms_keep)
-    chunks.slop(chrs, up = args.nuc_sep/2, down = args.nuc_sep/2)
+    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = vmat.mat.shape[1] + vmat.upper//2 + max(pwm.up,pwm.down) + args.nuc_sep//2, min_length = args.nuc_sep * 2, chroms_keep = chroms_keep)
+    chunks.slop(chrs, up = args.nuc_sep//2, down = args.nuc_sep//2)
     chunks.merge()
     maxQueueSize = args.cores*10
 
