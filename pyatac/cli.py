@@ -1,10 +1,29 @@
 import argparse
+import os
+import sys
 from pyatac import __version__
+
+_FILE_ARGS = {'bed', 'bam', 'fragments', 'fasta', 'sizes', 'bg'}
+
+def _validate_input_files(args):
+    """Check that all file arguments point to existing files."""
+    missing = []
+    for name in vars(args):
+        if name in _FILE_ARGS:
+            path = getattr(args, name)
+            if path is not None and not os.path.exists(path):
+                missing.append((name, path))
+    if missing:
+        for name, path in missing:
+            print("Error: file not found: " + path + " (--" + name + ")",
+                  file=sys.stderr)
+        sys.exit(1)
 
 def pyatac_main(args):
     """The Main function for calling pyatac
 
     """
+    _validate_input_files(args)
     call = args.call
     if call == "vplot":
         from pyatac.make_vplot import make_vplot
