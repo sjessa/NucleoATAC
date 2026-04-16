@@ -1,0 +1,14 @@
+NucleoATAC Hot-Function Benchmark - BASELINE (before optimization)
+==================================================================
+Pipeline wall-clock time: ~2 minutes (example data, --cores 2)
+
+Function                    Time/call   Notes
+--------------------------  ----------  ------------------------------------------
+calculateOccupancy()        1.5597 ms   Called ~2000x per 10kb chunk (5bp steps)
+calculateCov() [Cython O(n²)] 233.5 ms  Called ~50x per chunk; n=17666 elements
+makeFragmentMatFromFragments  6.47 ms   Per chunk; 5000 fragments simulated
+
+Projected improvements (vs numpy O(n) formula):
+  calculateCov numpy O(n):  0.0301 ms  -> 7769x speedup confirmed
+  fragmat vectorized:       2.79 ms    -> 2.3x speedup
+  makeBiasMat: 2000x np.convolve calls -> to be measured after implementation

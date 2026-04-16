@@ -111,7 +111,7 @@ class OccupancyCalcParams:
         nfr_probs = insert_dist.nfr_fit.get(lower,upper)
         self.nfr_probs = nfr_probs /np.sum(nfr_probs)
         self.alphas = np.linspace(0, 1, 101)
-        #self.x = map(lambda alpha: np.log(alpha * self.nuc_probs + (1 - alpha) * self.nfr_probs), self.alphas)
+        self.alphas_col = self.alphas[:, np.newaxis]  # (101, 1) for broadcasting
         self.l = len(self.alphas)
         self.cutoff = stats.chi2.ppf(ci,1)
 
@@ -123,8 +123,8 @@ def calculateOccupancy(inserts, bias, params):
     nuc_probs = nuc_probs / np.sum(nuc_probs)
     nfr_probs = params.nfr_probs * bias
     nfr_probs = nfr_probs / np.sum(nfr_probs)
-    x = list(map(lambda alpha: np.log(alpha * nuc_probs + (1 - alpha) * nfr_probs), params.alphas))
-    logliks = np.array(list(map(lambda j: np.sum(x[j]*inserts),range(params.l))))
+    mixed = params.alphas_col * nuc_probs + (1 - params.alphas_col) * nfr_probs
+    logliks = np.log(mixed) @ inserts
     logliks[np.isnan(logliks)] = -float('inf')
     occ = params.alphas[np.argmax(logliks)]
     #Compute upper and lower bounds for 95% confidence interval

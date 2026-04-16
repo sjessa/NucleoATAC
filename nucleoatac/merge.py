@@ -6,7 +6,7 @@ Script to merge nuc positions
 ##### IMPORT MODULES #####
 #
 
-from pyatac.utils import shell_command
+from pyatac.utils import shell_command, save_params_json
 from pyatac.chunk import Chunk, ChunkList
 import gzip
 import pysam
@@ -169,6 +169,13 @@ def run_merge(args):
     occ = NucList.read(args.occpeaks, "occ", args.min_occ)
     nuc = NucList.read(args.nucpos, "nuc", args.min_occ)
     new = merge(occ, nuc, args.sep)
+    save_params_json(args.out + '.merge.params.json', 'merge', {
+        "occpeaks": args.occpeaks,
+        "nucpos": args.nucpos,
+        "out": args.out,
+        "sep": args.sep,
+        "min_occ": args.min_occ,
+    })
     out = open(args.out + '.nucmap_combined.bed','w')
     out.write(new.asBed())
     out.close()

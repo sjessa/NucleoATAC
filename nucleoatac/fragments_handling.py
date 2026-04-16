@@ -132,29 +132,26 @@ def makeFragmentMatFromFragments(fragments, chrom, start, end, lower, upper):
     # open tabix-indexed file
     tbx = pysam.TabixFile(fragments)
 
-    # fetch to get an iterator over fragments in the specified chunk/region
-    for row in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
+    # collect all fragment coordinates in one pass (tabix fetch is sequential)
+    frag_starts = []
+    frag_ends = []
+    for frag in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
+        frag_starts.append(int(frag.start))
+        frag_ends.append(int(frag.end))
 
-        # extract fragment info 
-        fragment_start = int(row.start)
-        fragment_end = int(row.end)
-
-        # calculate the fragment size
-        ilen = fragment_end - fragment_start
-
-        # ensure the fragment size is within the specified bounds
-        if lower <= ilen < upper:
-            
-            # calculate row and column idx in the matrix
-            row = ilen - lower
-            col = (ilen - 1) // 2 + fragment_start - start
-
-            # check if the calculated column and row are within the matrix bounds
-            if 0 <= col < ncol and 0 <= row < nrow:
-                mat[row, col] += 1
-
-    # close the tabix file
     tbx.close()
+
+    if frag_starts:
+        # vectorized index computation
+        fs = np.array(frag_starts, dtype=np.int32)
+        fe = np.array(frag_ends, dtype=np.int32)
+        ilens = fe - fs
+        mask = (ilens >= lower) & (ilens < upper)
+        fs, ilens = fs[mask], ilens[mask]
+        rows = ilens - lower
+        cols = (ilens - 1) // 2 + fs - start
+        valid = (cols >= 0) & (cols < ncol) & (rows >= 0) & (rows < nrow)
+        np.add.at(mat, (rows[valid], cols[valid]), 1)
 
     return mat
 
@@ -186,29 +183,28 @@ def getInsertionsFromFragments(fragments, chrom, start, end, lower = 0, upper = 
     # open the tabix-indexed fragments file using pysam
     tbx = pysam.TabixFile(fragments)
 
-    # fetch fragments in the specified region
-    for row in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
-        
-        # get coordinates of the fragment
-        fragment_start = int(row.start)
-        fragment_end = int(row.end)
+    # collect all fragment coordinates in one pass (tabix fetch is sequential)
+    frag_starts = []
+    frag_ends = []
+    for frag in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
+        frag_starts.append(int(frag.start))
+        frag_ends.append(int(frag.end))
 
-        # calculate fragment size
-        ilen = fragment_end - fragment_start
-
-        # ensure the fragment size is within the specified bounds
-        if lower <= ilen < upper:
-            # calculate left (l_pos) and right (r_pos) insertion positions
-            l_pos = fragment_start
-            r_pos = fragment_end - 1
-
-            # increment the count at the insertion positions if within bounds
-            if start <= l_pos < end:
-                mat[l_pos - start] += 1
-            if start <= r_pos < end:
-                mat[r_pos - start] += 1
-
-    # close the tabix file
     tbx.close()
+
+    if frag_starts:
+        # vectorized index computation
+        fs = np.array(frag_starts, dtype=np.int32)
+        fe = np.array(frag_ends, dtype=np.int32)
+        ilens = fe - fs
+        mask = (ilens >= lower) & (ilens < upper)
+        fs, fe = fs[mask], fe[mask]
+        # left insertion positions (fragment start) and right (fragment end - 1)
+        l_pos = fs
+        r_pos = fe - 1
+        l_valid = (l_pos >= start) & (l_pos < end)
+        r_valid = (r_pos >= start) & (r_pos < end)
+        np.add.at(mat, l_pos[l_valid] - start, 1)
+        np.add.at(mat, r_pos[r_valid] - start, 1)
 
     return mat

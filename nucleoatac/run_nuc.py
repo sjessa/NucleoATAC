@@ -12,7 +12,7 @@ import numpy as np
 import traceback
 import itertools
 import pysam
-from pyatac.utils import shell_command,read_chrom_sizes_from_fasta
+from pyatac.utils import shell_command,read_chrom_sizes_from_fasta,save_params_json
 from pyatac.chunk import ChunkList
 from nucleoatac.NucleosomeCalling import NucChunk, NucParameters
 from pyatac.fragmentsizes import FragmentSizes
@@ -188,6 +188,30 @@ def run_nuc(args):
                            min_z = args.min_z, min_lr = args.min_lr , atac = args.atac)
     
     params.print_parameters()
+    save_params_json(args.out + '.nuc.params.json', 'nuc', {
+        "bed": args.bed,
+        "out": args.out,
+        "vmat": args.vmat,
+        "vmat_lower": params.lower,
+        "vmat_upper": params.upper,
+        "vmat_window": params.window,
+        "sizes": args.sizes,
+        "fasta": params.fasta,
+        "pwm": args.pwm,
+        "input_file": params.input_file,
+        "input_type": params.input_type,
+        "occ_track": params.occ_track,
+        "atac": params.atac,
+        "min_reads": params.min_reads,
+        "min_z": params.min_z,
+        "min_lr": params.min_lr,
+        "smooth_sd": params.smooth_sd,
+        "redundant_sep": params.redundant_sep,
+        "nonredundant_sep": params.nonredundant_sep,
+        "cores": args.cores,
+        "write_all": args.write_all,
+        "chroms_keep": getattr(args, 'chroms_keep', None),
+    })
 
     sets = chunks.split(items = args.cores*5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))

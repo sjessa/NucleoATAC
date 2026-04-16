@@ -155,13 +155,29 @@ class BiasMat2D(ChunkMat2D):
         if not bias_track.log:
             nonzero = np.where(bias !=0)[0]
             bias = np.log(bias + min(bias[nonzero]))
-        pattern = np.zeros((self.upper-self.lower,self.upper + (self.upper-1)%2))
-        mid = self.upper//2
-        for i in range(self.lower,self.upper):
-            pattern[i-self.lower,mid+(i-1)//2]=1
-            pattern[i-self.lower,mid-(i//2)]=1
-        for i in range(self.upper-self.lower):
-            self.mat[i]=np.exp(np.convolve(bias,pattern[i,:],mode='valid'))
+        # Each pattern row has exactly 2 nonzero entries (both = 1).
+        # For fragment size i, the entries are at columns:
+        #   p1 = mid + (i-1)//2  and  p2 = mid - i//2
+        # The valid convolution of bias with pattern row i equals:
+        #   bias[q1:q1+ncol] + bias[q2:q2+ncol]
+        # where q1 = L_p-1-p1 and q2 = L_p-1-p2, L_p = upper + (upper-1)%2
+        mid = self.upper // 2
+        L_p = self.upper + (self.upper - 1) % 2
+        i_vals = np.arange(self.lower, self.upper)      # fragment sizes
+        p1 = mid + (i_vals - 1) // 2                   # first 1 in each row
+        p2 = mid - (i_vals // 2)                        # second 1 in each row
+        q1 = L_p - 1 - p1                              # bias index offset for p1
+        q2 = L_p - 1 - p2                              # bias index offset for p2
+        k = np.arange(self.ncol)                        # position index (ncol,)
+        idx1 = q1[:, np.newaxis] + k[np.newaxis, :]    # (nrow, ncol)
+        idx2 = q2[:, np.newaxis] + k[np.newaxis, :]    # (nrow, ncol)
+        result = bias[idx1] + bias[idx2]
+        # For fragment size i=1 (and only i=1), p1 == p2 so the pattern has
+        # a single unique 1; correct the double-counted rows.
+        same_mask = (p1 == p2)
+        if np.any(same_mask):
+            result[same_mask] = bias[idx1[same_mask]]
+        self.mat = np.exp(result)
     def normByInsertDist(self, insertsizes):
         inserts = insertsizes.get(self.lower,self.upper)
         self.mat = self.mat * np.reshape(np.tile(inserts,self.mat.shape[1]),self.mat.shape,order="F")

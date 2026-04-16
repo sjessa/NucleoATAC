@@ -15,7 +15,7 @@ except ImportError:
 
 setup(
     name='NucleoATAC',
-    version='0.5.0',
+    version='1.0.0',
     description='Python package for calling nucleosomes with ATAC-Seq',
     classifiers=[
         'Development Status :: 4 - Beta',

@@ -348,3 +348,39 @@ class TestPy2Regression(TestCase):
         test_path = self._out("example.ins.bedgraph")
         test_size = os.path.getsize(test_path) if os.path.exists(test_path) else 0
         self.assertEqual(test_size, 0, "ins.bedgraph should be empty")
+
+    # -- Parameter JSON files --
+
+    def _check_params_json(self, filename, step_name, expected_keys):
+        """Helper to validate a params JSON file."""
+        import json
+        path = self._out(filename)
+        self.assertTrue(os.path.exists(path), f"{filename} should exist")
+        with open(path) as f:
+            data = json.load(f)
+        self.assertEqual(data["pipeline_step"], step_name)
+        self.assertIn("nucleoatac_version", data)
+        self.assertIn("timestamp", data)
+        for key in expected_keys:
+            self.assertIn(key, data, f"{filename} missing key: {key}")
+        return data
+
+    def test_occ_params_json(self):
+        self._check_params_json("example.occ.params.json", "occ",
+            ["sep", "fasta", "upper", "flank", "window", "min_occ", "step"])
+
+    def test_vprocess_params_json(self):
+        self._check_params_json("example.vprocess.params.json", "vprocess",
+            ["lower", "upper", "flank", "smooth"])
+
+    def test_nuc_params_json(self):
+        self._check_params_json("example.nuc.params.json", "nuc",
+            ["vmat", "min_z", "smooth_sd", "atac", "redundant_sep"])
+
+    def test_merge_params_json(self):
+        self._check_params_json("example.merge.params.json", "merge",
+            ["occpeaks", "nucpos", "sep", "min_occ"])
+
+    def test_nfr_params_json(self):
+        self._check_params_json("example.nfr.params.json", "nfr",
+            ["occ_track", "calls", "max_occ", "max_occ_upper"])

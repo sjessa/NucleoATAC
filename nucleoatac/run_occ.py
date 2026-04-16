@@ -14,7 +14,7 @@ import numpy as np
 import traceback
 import itertools
 import pysam
-from pyatac.utils import shell_command,read_chrom_sizes_from_bam,read_chrom_sizes_from_fasta
+from pyatac.utils import shell_command,read_chrom_sizes_from_bam,read_chrom_sizes_from_fasta,save_params_json
 from pyatac.chunk import ChunkList
 from nucleoatac.Occupancy import FragmentMixDistribution, OccupancyParameters, OccChunk
 from pyatac.fragmentsizes import FragmentSizes
@@ -160,7 +160,26 @@ def run_occ(args):
                                  ci = args.confidence_interval, step = args.step)
     
     params.print_parameters()
-    
+    save_params_json(args.out + '.occ.params.json', 'occ', {
+        "bed": args.bed,
+        "out": args.out,
+        "fasta": params.fasta,
+        "pwm": args.pwm,
+        "input_file": params.input_file,
+        "input_type": params.input_type,
+        "sep": params.sep,
+        "upper": params.upper,
+        "flank": params.flank,
+        "window": params.window,
+        "min_occ": params.min_occ,
+        "step": params.step,
+        "halfstep": params.halfstep,
+        "confidence_interval": args.confidence_interval,
+        "cores": args.cores,
+        "sizes": args.sizes,
+        "chroms_keep": getattr(args, 'chroms_keep', None),
+    })
+
     print("@ calculating occupancy...")
     sets = chunks.split(items = args.cores * 5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))

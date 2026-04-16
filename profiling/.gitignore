@@ -1,0 +1,6 @@
+# Pipeline output files from profiling runs — large, binary, reproducible
+before/example.*
+after/example.*
+
+# cProfile output only captured imports (not useful)
+before/cprofile.txt

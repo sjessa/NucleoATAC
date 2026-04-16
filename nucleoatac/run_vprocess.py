@@ -11,6 +11,7 @@ Use insert distribution at nuclesomal regions in peaks for normalization
 #mpl.use('PS')
 import pyatac.VMat as V
 from pyatac.fragmentsizes import FragmentSizes
+from pyatac.utils import save_params_json
 
 def run_vprocess(args):
     """process vplot
@@ -40,6 +41,16 @@ def run_vprocess(args):
     #make plot and save
     vmat.save(args.out+".VMat")
     vmat.plot(filename = args.out+".VMat.pdf")
+    save_params_json(args.out + '.vprocess.params.json', 'vprocess', {
+        "out": args.out,
+        "vplot": args.vplot,
+        "lower": args.lower,
+        "upper": args.upper,
+        "flank": args.flank,
+        "sizes": args.sizes,
+        "smooth": args.smooth,
+        "plot_extra": args.plot_extra,
+    })
 
 
 

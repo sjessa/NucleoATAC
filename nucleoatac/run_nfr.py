@@ -12,7 +12,7 @@ import os
 import traceback
 import itertools
 import pysam
-from pyatac.utils import shell_command, read_chrom_sizes_from_fasta, read_chrom_sizes_from_bam
+from pyatac.utils import shell_command, read_chrom_sizes_from_fasta, read_chrom_sizes_from_bam, save_params_json
 from pyatac.chunk import ChunkList
 from nucleoatac.NFRCalling import NFRParameters, NFRChunk
 from pyatac.bias import PWM
@@ -111,6 +111,20 @@ def run_nfr(args):
                             fasta = args.fasta, pwm = args.pwm)
     
     params.print_parameters()
+    save_params_json(args.out + '.nfr.params.json', 'nfr', {
+        "bed": args.bed,
+        "out": args.out,
+        "fasta": args.fasta,
+        "pwm": args.pwm,
+        "input_file": params.input_file,
+        "input_type": params.input_type,
+        "occ_track": params.occ_track,
+        "calls": params.calls,
+        "ins_track": params.ins_track,
+        "max_occ": params.max_occ,
+        "max_occ_upper": params.max_occ_upper,
+        "cores": args.cores,
+    })
 
     sets = chunks.split(items = args.cores * 5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))

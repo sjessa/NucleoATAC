@@ -5,7 +5,10 @@ General tools for dealing with ATAC-Seq data using Python.
 @author: Alicia Schep, Greenleaf Lab, Stanford University
 """
 
+import json
 import subprocess
+from datetime import datetime
+
 import numpy as np
 from scipy import signal
 import pysam
@@ -17,6 +20,19 @@ def shell_command(cmd):
     """Conduct shell command."""
     output = subprocess.check_output(cmd, shell = True).decode('utf-8')
     return(output)
+
+
+def save_params_json(filepath, step_name, params_dict):
+    """Save pipeline parameters to a JSON file."""
+    from nucleoatac import __version__
+    output = {
+        "nucleoatac_version": __version__,
+        "pipeline_step": step_name,
+        "timestamp": datetime.now().isoformat(),
+    }
+    output.update(params_dict)
+    with open(filepath, 'w') as f:
+        json.dump(output, f, indent=2, default=str)
 
 
 #Smoothing function
