@@ -111,11 +111,11 @@ class NFRChunk(Chunk):
     def findNFRs(self):
         """find NFR regions"""
         region = np.ones(self.length())
-        tbx = pysam.TabixFile(self.params.calls)
         nucs = []
-        if self.chrom in tbx.contigs:
-            for row in tbx.fetch(self.chrom, self.start, self.end, parser = pysam.asTuple()):
-                nucs.append(int(row[1]))
+        with pysam.TabixFile(self.params.calls) as tbx:
+            if self.chrom in tbx.contigs:
+                for row in tbx.fetch(self.chrom, self.start, self.end, parser = pysam.asTuple()):
+                    nucs.append(int(row[1]))
         for j in range(1,len(nucs)):
             left = nucs[j-1] + 73
             right = nucs[j] - 72

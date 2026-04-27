@@ -143,10 +143,10 @@ def read_chrom_sizes_from_bam(bamfile):
 def read_chrom_sizes(sizesFile):
     """get chromosome size information from chromosome sizes file"""
     out = {}
-    f = open(sizesFile,'r')
-    for line in f:
-        keys = line.rstrip("\n").split("\t")
-        out[keys[0]] = int(keys[1])
+    with open(sizesFile,'r') as f:
+        for line in f:
+            keys = line.rstrip("\n").split("\t")
+            out[keys[0]] = int(keys[1])
     return out
 
 

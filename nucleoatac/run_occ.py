@@ -9,6 +9,7 @@ Script to make nucleosome occupancy track!
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 import numpy as np
+import os
 import traceback
 import itertools
 import pysam
@@ -203,11 +204,11 @@ def run_occ(args):
 
     print("@ compressing and indexing output files...")
     pysam.tabix_compress(args.out + '.occpeaks.bed', args.out + '.occpeaks.bed.gz',force = True)
-    shell_command('rm ' + args.out + '.occpeaks.bed')
+    os.remove(args.out + '.occpeaks.bed')
     pysam.tabix_index(args.out + '.occpeaks.bed.gz', preset = "bed", force = True)
     for i in ('occ','occ.lower_bound','occ.upper_bound'):
         pysam.tabix_compress(args.out + '.' + i + '.bedgraph', args.out + '.'+i+'.bedgraph.gz',force = True)
-        shell_command('rm ' + args.out + '.' + i + '.bedgraph')
+        os.remove(args.out + '.' + i + '.bedgraph')
         pysam.tabix_index(args.out + '.' + i + '.bedgraph.gz', preset = "bed", force = True)
 
     dist_out = FragmentSizes(0, args.upper, vals = nuc_dist)

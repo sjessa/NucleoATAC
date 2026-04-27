@@ -31,23 +31,20 @@ def getAllFragmentSizesFromFragsFile(fragments, lower, upper):
     sizes = np.zeros(upper - lower, dtype=np.float64)
 
     # open tabix-indexed frags file
-    tbx = pysam.TabixFile(fragments)
+    with pysam.TabixFile(fragments) as tbx:
+        # fetch to get an iterator over all fragments
+        for row in tbx.fetch(parser=pysam.asBed()):
 
-    # fetch to get an iterator over all fragments
-    for row in tbx.fetch(parser=pysam.asBed()):
-            
-        # extract coords of fragment
-        start = int(row.start)
-        end = int(row.end)
+            # extract coords of fragment
+            start = int(row.start)
+            end = int(row.end)
 
-        # calculate fragment size
-        ilen = end - start
-        
-        # only count fragments within the specified size range
-        if lower <= ilen < upper:
-            sizes[ilen - lower] += 1
+            # calculate fragment size
+            ilen = end - start
 
-    tbx.close()
+            # only count fragments within the specified size range
+            if lower <= ilen < upper:
+                sizes[ilen - lower] += 1
 
     return sizes
 
@@ -73,29 +70,26 @@ def getAllFragmentSizesFromFragsFileFromChunkList(chunks, fragments, lower, uppe
     sizes = np.zeros(upper - lower, dtype=np.float64)
 
     # open the tabix-indexed fragments file using pysam
-    tbx = pysam.TabixFile(fragments)
+    with pysam.TabixFile(fragments) as tbx:
+        # iterate over each chunk in the ChunkList
+        for chunk in chunks:
 
-    # iterate over each chunk in the ChunkList
-    for chunk in chunks:
-        
-        # fetch fragments in the specified chunk region
-        for row in tbx.fetch(chunk.chrom, max(0, chunk.start - upper), chunk.end + upper, parser=pysam.asBed()):
+            # fetch fragments in the specified chunk region
+            for row in tbx.fetch(chunk.chrom, max(0, chunk.start - upper), chunk.end + upper, parser=pysam.asBed()):
 
-            # extract coords of fragment
-            fragment_start = int(row.start)
-            fragment_end = int(row.end)
+                # extract coords of fragment
+                fragment_start = int(row.start)
+                fragment_end = int(row.end)
 
-            # calculate fragment size
-            ilen = fragment_end - fragment_start
+                # calculate fragment size
+                ilen = fragment_end - fragment_start
 
-            # calculate the center of the fragment
-            center = fragment_start + (ilen - 1) // 2
+                # calculate the center of the fragment
+                center = fragment_start + (ilen - 1) // 2
 
-            # check if fragment size is within the specified bounds and if the center is within the chunk
-            if lower <= ilen < upper and chunk.start <= center < chunk.end:
-                sizes[ilen - lower] += 1
-
-    tbx.close()
+                # check if fragment size is within the specified bounds and if the center is within the chunk
+                if lower <= ilen < upper and chunk.start <= center < chunk.end:
+                    sizes[ilen - lower] += 1
 
     return sizes
 
@@ -130,16 +124,13 @@ def makeFragmentMatFromFragments(fragments, chrom, start, end, lower, upper):
     mat = np.zeros((nrow, ncol), dtype=np.float64)
 
     # open tabix-indexed file
-    tbx = pysam.TabixFile(fragments)
-
-    # collect all fragment coordinates in one pass (tabix fetch is sequential)
     frag_starts = []
     frag_ends = []
-    for frag in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
-        frag_starts.append(int(frag.start))
-        frag_ends.append(int(frag.end))
-
-    tbx.close()
+    with pysam.TabixFile(fragments) as tbx:
+        # collect all fragment coordinates in one pass (tabix fetch is sequential)
+        for frag in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
+            frag_starts.append(int(frag.start))
+            frag_ends.append(int(frag.end))
 
     if frag_starts:
         # vectorized index computation
@@ -181,16 +172,13 @@ def getInsertionsFromFragments(fragments, chrom, start, end, lower = 0, upper = 
     mat = np.zeros(npos, dtype=np.float64)
 
     # open the tabix-indexed fragments file using pysam
-    tbx = pysam.TabixFile(fragments)
-
-    # collect all fragment coordinates in one pass (tabix fetch is sequential)
     frag_starts = []
     frag_ends = []
-    for frag in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
-        frag_starts.append(int(frag.start))
-        frag_ends.append(int(frag.end))
-
-    tbx.close()
+    with pysam.TabixFile(fragments) as tbx:
+        # collect all fragment coordinates in one pass (tabix fetch is sequential)
+        for frag in tbx.fetch(chrom, start, end, parser=pysam.asBed()):
+            frag_starts.append(int(frag.start))
+            frag_ends.append(int(frag.end))
 
     if frag_starts:
         # vectorized index computation

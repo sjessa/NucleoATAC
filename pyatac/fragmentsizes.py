@@ -56,41 +56,39 @@ class FragmentSizes:
             
     def save(self, filename):
         """Save Fragment Distribution information"""
-        f = open(filename,"w")
-        f.write("#lower\n")
-        f.write(str(self.lower)+"\n")
-        f.write("#upper\n")
-        f.write(str(self.upper)+"\n")
-        f.write("#sizes\n")
-        f.write("\t".join(map(str,self.get()))+"\n")
-        f.close()
+        with open(filename,"w") as f:
+            f.write("#lower\n")
+            f.write(str(self.lower)+"\n")
+            f.write("#upper\n")
+            f.write(str(self.upper)+"\n")
+            f.write("#sizes\n")
+            f.write("\t".join(map(str,self.get()))+"\n")
 
     @staticmethod
     def open(filename):
         """Create FragmentDistribution object from text descriptor file"""
-        infile = open(filename,'r')
         state = ''
-        for line in infile:
-            if '#lower' in line:
-                state = 'lower'
-            elif '#upper' in line:
-                state = 'upper'
-            elif '#sizes' in line:
-                state = 'sizes'
-            elif '#' in line:
-                state = 'other'
-            elif state == 'lower':
-                lower = int(line.strip('\n'))
-            elif state == 'upper':
-                upper = int(line.strip('\n'))
-            elif state == 'sizes':
-                fragmentsizes = np.array(list(map(float,line.rstrip("\n").split("\t"))))
+        with open(filename,'r') as infile:
+            for line in infile:
+                if '#lower' in line:
+                    state = 'lower'
+                elif '#upper' in line:
+                    state = 'upper'
+                elif '#sizes' in line:
+                    state = 'sizes'
+                elif '#' in line:
+                    state = 'other'
+                elif state == 'lower':
+                    lower = int(line.strip('\n'))
+                elif state == 'upper':
+                    upper = int(line.strip('\n'))
+                elif state == 'sizes':
+                    fragmentsizes = np.array(list(map(float,line.rstrip("\n").split("\t"))))
         try:
             new = FragmentSizes(lower, upper, vals = fragmentsizes)
         except NameError:
             raise Exception("FragmentDistribution decriptor file appeas to be missing some\
 needed components")
-        infile.close()
         return new
 
 

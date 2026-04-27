@@ -35,30 +35,27 @@ class NucList(ChunkList):
     @staticmethod
     def read(bedfile, source, min_occ = 0):
         """Make a list of chunks from a tab-delimited bedfile"""
-        if bedfile[-3:] == '.gz':
-            infile = gzip.open(bedfile,"rt")
-        else:
-            infile = open(bedfile,"r")
+        opener = gzip.open if bedfile[-3:] == '.gz' else open
         out = NucList()
-        for line in infile:
-            in_line = line.rstrip('\n').split("\t")
-            start = int(in_line[1])
-            end = int(in_line[2])
-            if source == "occ":
-                occ = float(in_line[3])
-                occ_lower = float(in_line[4])
-                occ_upper = float(in_line[5])
-                reads = float(in_line[6])
-            elif source == "nuc":
-                occ = float(in_line[4])
-                occ_lower = float(in_line[5])
-                occ_upper = float(in_line[6])
-                reads = float(in_line[10]) + float(in_line[11])
-            else:
-                raise Exception("source must be 'occ' or 'nuc'")
-            if occ_lower >= min_occ:
-                out.append(MergedNuc(in_line[0],start, end, occ, occ_lower, occ_upper, reads, source))
-        infile.close()
+        with opener(bedfile,"rt") as infile:
+            for line in infile:
+                in_line = line.rstrip('\n').split("\t")
+                start = int(in_line[1])
+                end = int(in_line[2])
+                if source == "occ":
+                    occ = float(in_line[3])
+                    occ_lower = float(in_line[4])
+                    occ_upper = float(in_line[5])
+                    reads = float(in_line[6])
+                elif source == "nuc":
+                    occ = float(in_line[4])
+                    occ_lower = float(in_line[5])
+                    occ_upper = float(in_line[6])
+                    reads = float(in_line[10]) + float(in_line[11])
+                else:
+                    raise Exception("source must be 'occ' or 'nuc'")
+                if occ_lower >= min_occ:
+                    out.append(MergedNuc(in_line[0],start, end, occ, occ_lower, occ_upper, reads, source))
         return out
 
 
@@ -176,11 +173,10 @@ def run_merge(args):
         "sep": args.sep,
         "min_occ": args.min_occ,
     })
-    out = open(args.out + '.nucmap_combined.bed','w')
-    out.write(new.asBed())
-    out.close()
+    with open(args.out + '.nucmap_combined.bed','w') as out:
+        out.write(new.asBed())
     pysam.tabix_compress(args.out + '.nucmap_combined.bed', args.out + '.nucmap_combined.bed.gz',force = True)
-    shell_command('rm ' + args.out + '.nucmap_combined.bed')
+    os.remove(args.out + '.nucmap_combined.bed')
     pysam.tabix_index(args.out + '.nucmap_combined.bed.gz', preset = "bed", force = True)
  
 

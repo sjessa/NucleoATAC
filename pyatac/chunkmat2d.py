@@ -143,8 +143,9 @@ class BiasMat2D(ChunkMat2D):
         offset = self.upper//2
         bias = bias_track.get(self.start-offset,self.end+offset)
         if not bias_track.log:
-            nonzero = np.where(bias !=0)[0]
-            bias = np.log(bias + min(bias[nonzero]))
+            nonzero = np.where(bias != 0)[0]
+            min_nonzero = min(bias[nonzero]) if len(nonzero) > 0 else 1e-300
+            bias = np.log(bias + min_nonzero)
         # Each pattern row has exactly 2 nonzero entries (both = 1).
         # For fragment size i, the entries are at columns:
         #   p1 = mid + (i-1)//2  and  p2 = mid - i//2

@@ -9,6 +9,7 @@ Script to call nucleosome positions-- track making, nucleosome calling, and nfr 
 #mpl.use('PS')
 import multiprocessing as mp
 import numpy as np
+import os
 import traceback
 import itertools
 import pysam
@@ -246,11 +247,11 @@ def run_nuc(args):
         write_processes[i].join()
         if i not in ['nucpos','nucpos.redundant']:
             pysam.tabix_compress(args.out + '.' + i + '.bedgraph', args.out +  '.' + i + '.bedgraph.gz',force = True)
-            shell_command('rm ' + args.out +  '.' + i + '.bedgraph')
+            os.remove(args.out + '.' + i + '.bedgraph')
             pysam.tabix_index(args.out +  '.' + i + '.bedgraph.gz', preset = "bed", force = True)
         else:
             pysam.tabix_compress(args.out + '.' + i + '.bed', args.out +  '.' + i + '.bed.gz',force = True)
-            shell_command('rm ' + args.out +  '.' + i + '.bed')
+            os.remove(args.out + '.' + i + '.bed')
             pysam.tabix_index(args.out +  '.' + i + '.bed.gz', preset = "bed", force = True)
  
 

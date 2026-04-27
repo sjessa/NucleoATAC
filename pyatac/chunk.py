@@ -143,44 +143,41 @@ class ChunkList(list):
         - chroms_keep: list of chromosomes to keep
         
         """
-        if bedfile[-3:] == '.gz':
-            infile = gzip.open(bedfile,"rt")
-        else:
-            infile = open(bedfile,"r")
+        opener = gzip.open if bedfile[-3:] == '.gz' else open
         out = ChunkList()
         weight = None
         strand = "+"
         name = None
         if chromDict is not None:
             bad_chroms = []
-        for line in infile:
-            in_line = line.rstrip('\n').split("\t")
-            if weight_col:
-                weight=in_line[weight_col-1]
-            if strand_col:
-                strand = in_line[strand_col-1]
-            if name_col:
-                name = in_line[strand_col-1]
-            start = int(in_line[1])
-            end = int(in_line[2])
-            chrom = in_line[0]
+        with opener(bedfile,"rt") as infile:
+            for line in infile:
+                in_line = line.rstrip('\n').split("\t")
+                if weight_col:
+                    weight=in_line[weight_col-1]
+                if strand_col:
+                    strand = in_line[strand_col-1]
+                if name_col:
+                    name = in_line[name_col-1]
+                start = int(in_line[1])
+                end = int(in_line[2])
+                chrom = in_line[0]
 
-            # only analyze regions on specified chromosomes
-            if chroms_keep is not None and chrom not in chroms_keep:
-                continue
+                # only analyze regions on specified chromosomes
+                if chroms_keep is not None and chrom not in chroms_keep:
+                    continue
 
-            if chromDict is not None and chrom not in chromDict.keys():
-                bad_chroms.append(chrom)
-                continue
-            if min_offset:
-                if start < min_offset:
-                    start = min_offset
-                if end > (chromDict[in_line[0]] - min_offset):
-                    end = chromDict[in_line[0]] - min_offset
-            if end - start >= min_length:
-                out.append(Chunk(in_line[0],start, end,
-                                   weight = weight, strand = strand, name = name))
-        infile.close()
+                if chromDict is not None and chrom not in chromDict.keys():
+                    bad_chroms.append(chrom)
+                    continue
+                if min_offset:
+                    if start < min_offset:
+                        start = min_offset
+                    if end > (chromDict[in_line[0]] - min_offset):
+                        end = chromDict[in_line[0]] - min_offset
+                if end - start >= min_length:
+                    out.append(Chunk(in_line[0],start, end,
+                                       weight = weight, strand = strand, name = name))
         if chromDict is not None and len(bad_chroms)>0:
             bad_chroms = set(bad_chroms)
             warn_message = (str(len(bad_chroms)) + " chromosome names in bed file not included in " +

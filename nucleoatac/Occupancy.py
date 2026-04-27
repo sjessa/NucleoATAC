@@ -65,14 +65,16 @@ class FragmentMixDistribution:
         res = res_param[whichres]
         self.nfr_fit0 = FragmentSizes(self.lower,self.upper, vals = gamma_fit(np.arange(self.lower,self.upper),whichres,res_param[whichres]))
         nfr = np.concatenate((self.fragmentsizes.get(self.lower,boundaries[1]), self.nfr_fit0.get(boundaries[1],self.upper))) 
-        nfr[nfr==0] = min(nfr[nfr!=0])*0.01
+        nonzero_nfr = nfr[nfr != 0]
+        nfr[nfr == 0] = (min(nonzero_nfr) * 0.01) if len(nonzero_nfr) > 0 else 1e-10
         self.nfr_fit = FragmentSizes(self.lower,self.upper, vals = nfr)
 
         nuc = np.concatenate((np.zeros(boundaries[1]-self.lower),
                             self.fragmentsizes.get(boundaries[1],self.upper) -
                             self.nfr_fit.get(boundaries[1],self.upper)))
-        
-        nuc[nuc<=0]=min(min(nfr)*0.1,min(nuc[nuc>0])*0.001)
+        pos_nuc = nuc[nuc > 0]
+        floor = min(min(nfr) * 0.1, min(pos_nuc) * 0.001) if len(pos_nuc) > 0 else min(nfr) * 0.1
+        nuc[nuc <= 0] = floor
         self.nuc_fit = FragmentSizes(self.lower, self.upper, vals = nuc)
 
     def plotFits(self,filename=None):
@@ -128,8 +130,13 @@ def calculateOccupancy(inserts, bias, params):
     occ = params.alphas[np.argmax(logliks)]
     #Compute upper and lower bounds for 95% confidence interval
     ratios = 2*(max(logliks)-logliks)
-    lower = params.alphas[min(np.where(ratios < params.cutoff)[0])]
-    upper = params.alphas[max(np.where(ratios < params.cutoff)[0])]
+    ci_idx = np.where(ratios < params.cutoff)[0]
+    if len(ci_idx) == 0:
+        lower = params.alphas[0]
+        upper = params.alphas[-1]
+    else:
+        lower = params.alphas[ci_idx[0]]
+        upper = params.alphas[ci_idx[-1]]
     return occ, lower, upper
 
 

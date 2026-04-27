@@ -27,9 +27,9 @@ class Track(Chunk):
             raise Exception("Input vals must be of length as set by start and end!")
     def assign_track(self, vals, start = None, end = None):
         """Assign values to track"""
-        if start:
+        if start is not None:
             self.start = start
-        if end:
+        if end is not None:
             self.end = end
         if len(vals)!= self.end - self.start:
             raise Exception("The values being assigned to track do not \
@@ -75,11 +75,11 @@ class Track(Chunk):
         handle.write(output)
     def read_track(self, bedgraph, start = None, end = None, empty = np.nan, flank = None):
         """Read track values from BigWig file handle"""
-        if start:
+        if start is not None:
             self.start = start
-        if end:
+        if end is not None:
             self.end = end
-        if flank:
+        if flank is not None:
             self.start = self.start - flank
             self.end = self.end + flank
         handle = BedGraphFile(bedgraph)

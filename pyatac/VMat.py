@@ -104,7 +104,9 @@ class VMat:
     def norm_y(self,dist):
         """normalize vplot so insertsize matches supplied distribution"""
         for i in range(self.mat.shape[0]):
-            self.mat[i] = self.mat[i]  * (dist.get(size = i + self.lower)/ np.sum(self.mat[i]))
+            row_sum = np.sum(self.mat[i])
+            if row_sum > 0:
+                self.mat[i] = self.mat[i] * (dist.get(size=i + self.lower) / row_sum)
     def converto1d(self):
         """convert the 2d matrix to a 1d representation of insertions"""
         self.one_d = np.zeros(self.upper + self.upper%2 +2*self.w+1)
@@ -177,42 +179,40 @@ class VMat:
             fig.show()
     def save(self,filename):
         """write text output description of VMat object attributes"""
-        out=open(filename,'w')
-        out.write('#VMat Descriptor File\n')
-        out.write('#Contains VMat and pertinent information\n')
-        out.write('#lower\n')
-        out.write(str(self.lower)+'\n')
-        out.write('#upper\n')
-        out.write(str(self.upper)+'\n')
-        out.write('#mat\n')
-        for row in self.mat:
-            out.write("\t".join(map(str,row))+'\n')
-        out.close()
+        with open(filename,'w') as out:
+            out.write('#VMat Descriptor File\n')
+            out.write('#Contains VMat and pertinent information\n')
+            out.write('#lower\n')
+            out.write(str(self.lower)+'\n')
+            out.write('#upper\n')
+            out.write(str(self.upper)+'\n')
+            out.write('#mat\n')
+            for row in self.mat:
+                out.write("\t".join(map(str,row))+'\n')
     @staticmethod
     def open(filename):
         """Create VMat object from text descriptor file"""
-        infile = open(filename,'r')
         state = ''
         mat = []
-        for line in infile:
-            if '#lower' in line:
-                state = 'lower'
-            elif '#upper' in line:
-                state = 'upper'
-            elif '#mat' in line:
-                state = 'mat'
-            elif '#' in line:
-                state = 'other'
-            elif state == 'lower':
-                lower = int(line.strip('\n'))
-            elif state == 'upper':
-                upper = int(line.strip('\n'))
-            elif state == 'mat':
-                mat.append(list(map(float,line.strip('\n').split('\t'))))
+        with open(filename,'r') as infile:
+            for line in infile:
+                if '#lower' in line:
+                    state = 'lower'
+                elif '#upper' in line:
+                    state = 'upper'
+                elif '#mat' in line:
+                    state = 'mat'
+                elif '#' in line:
+                    state = 'other'
+                elif state == 'lower':
+                    lower = int(line.strip('\n'))
+                elif state == 'upper':
+                    upper = int(line.strip('\n'))
+                elif state == 'mat':
+                    mat.append(list(map(float,line.strip('\n').split('\t'))))
         try:
             new = VMat(np.array(mat), lower, upper)
         except NameError:
             raise VMat_Error("VMat decriptor file appeas to be missing some\
 needed components")
-        infile.close()
         return new

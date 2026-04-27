@@ -13,11 +13,10 @@ def get_sequence(chunk, fastafile):
         chunk:  chunk object for which sequenceuence is to be fetched
         fastafile: filename for fasta file with sequenceuence
     """
-    handle = pysam.FastaFile(fastafile)
-    sequence = handle.fetch(chunk.chrom, chunk.start, chunk.end)
+    with pysam.FastaFile(fastafile) as handle:
+        sequence = handle.fetch(chunk.chrom, chunk.start, chunk.end)
     if chunk.strand == "-":
         sequence = reverse_complement(sequence)
-    handle.close()
     return sequence.upper()
 
 
@@ -47,13 +46,12 @@ def getNucFreqs(fasta, nucleotides):
     """Get genomewide nucleotide frequencies"""
     out = np.zeros(len(nucleotides))
     n = 0.0
-    f = open(fasta,'r')
-    for line in f:
-        if line[0]!='>':
-            sequence = line.rstrip('\n').upper()
-            out += [sequence.count(i) for i in nucleotides]
-            n += len(sequence)
-    f.close()
+    with open(fasta,'r') as f:
+        for line in f:
+            if line[0]!='>':
+                sequence = line.rstrip('\n').upper()
+                out += [sequence.count(i) for i in nucleotides]
+                n += len(sequence)
     return out/n
 
 

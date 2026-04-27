@@ -116,8 +116,8 @@ class Nucleosome(Chunk):
         nuc_model = nuctrack.params.vmat.mat * bias_mat
         nuc_model = nuc_model / np.sum(nuc_model)
         null_model = null_mat / np.sum(null_mat)
-        nuc_lik = np.sum(np.log(nuc_model) * mat)
-        null_lik = np.sum(np.log(null_model) * mat)
+        nuc_lik = np.sum(np.log(np.clip(nuc_model, 1e-300, None)) * mat)
+        null_lik = np.sum(np.log(np.clip(null_model, 1e-300, None)) * mat)
         self.lr = nuc_lik - null_lik
     def getZScore(self, nuctrack):
         s = SignalDistribution(self.start, nuctrack.params.vmat, nuctrack.bias_mat,
