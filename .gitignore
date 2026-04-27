@@ -23,6 +23,10 @@ example/test_results/*
 
 #regression test output (regenerated each run)
 tests/py3_regression_output/
+tests/py3_parallel_nuc_output/
+
+profiling/py3_parallel/
 
 CLAUDE.md
 PLAN.md
+CODE_REVIEW.md

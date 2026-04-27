@@ -34,6 +34,10 @@ class Test_Track(TestCase):
         track.read_track('example/example.Scores.bedgraph.gz')
         val = 1.35994655714
         self.assertTrue(abs(val - track.get(pos = 706661))<0.001)
+    def test_get_pos_zero(self):
+        """test that Track.get(pos=0) works when track starts at 0 (regression for 'if pos:' bug)"""
+        track = Track("chrI", 0, 5, vals=np.array([7.0, 2.0, 3.0, 4.0, 5.0]))
+        self.assertEqual(track.get(pos=0), 7.0)
 
 
 

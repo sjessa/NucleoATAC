@@ -129,7 +129,7 @@ class Nucleosome(Chunk):
             self.occ = nuctrack.occ.get(pos = self.start)
             self.occ_lower = nuctrack.occ_lower.get(pos = self.start)
             self.occ_upper = nuctrack.occ_upper.get(pos = self.start)
-        except:
+        except Exception:
             self.occ = np.nan
             self.occ_lower = np.nan
             self.occ_upper = np.nan

@@ -105,7 +105,6 @@ class OccupancyCalcParams:
     def __init__(self, lower, upper , insert_dist, ci = 0.9):
         self.lower = lower
         self.upper = upper
-        #self.smooth_mat = np.tile(signal.gaussian(151,25),(upper-lower,1))
         nuc_probs = insert_dist.nuc_fit.get(lower,upper)
         self.nuc_probs = nuc_probs /np.sum(nuc_probs)
         nfr_probs = insert_dist.nfr_fit.get(lower,upper)

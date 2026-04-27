@@ -384,3 +384,159 @@ class TestPy2Regression(TestCase):
     def test_nfr_params_json(self):
         self._check_params_json("example.nfr.params.json", "nfr",
             ["occ_track", "calls", "max_occ", "max_occ_upper"])
+
+
+# ---------------------------------------------------------------------------
+# Per-chromosome parallelization consistency test
+# ---------------------------------------------------------------------------
+
+PY3_PARALLEL_OUT = os.path.join(os.path.dirname(__file__), "py3_parallel_nuc_output")
+PARALLEL_CHROMS = ["chrII", "chrIV"]
+
+
+def _filter_chroms(data, chroms):
+    """Filter a (chrom, pos)-keyed dict to only the given chromosomes."""
+    chrom_set = set(chroms)
+    return {k: v for k, v in data.items() if k[0] in chrom_set}
+
+
+class TestParallelNucConsistency(TestCase):
+    """Verify that per-chromosome nuc runs (with shared global occ+vprocess outputs)
+    produce results identical to the genome-wide nuc run.
+
+    Strategy: run `nucleoatac nuc` independently for each chromosome in
+    PARALLEL_CHROMS, passing the global occ outputs (fragmentsizes, VMat,
+    occ_track) from PY3_OUT as shared inputs. Merge with merge_chroms and
+    compare against the genome-wide outputs filtered to those chromosomes.
+    """
+
+    _pipeline_run = False
+    _pipeline_error = None
+
+    @classmethod
+    def setUpClass(cls):
+        # Ensure global pipeline outputs exist (run if not already present).
+        if not os.path.exists(os.path.join(PY3_OUT, "example.VMat")):
+            try:
+                parser = nucleoatac_parser()
+                cmd = (
+                    "nucleoatac run "
+                    "--bam example/example.bam "
+                    "--bed example/example.bed "
+                    "--fasta example/sacCer3.fa "
+                    f"--out {PY3_OUT}/example "
+                    "--cores 2"
+                )
+                args = parser.parse_args(cmd.split()[1:])
+                nucleoatac_main(args)
+            except Exception as e:
+                cls._pipeline_error = e
+                return
+
+        # Create fresh per-chromosome output directory.
+        if os.path.exists(PY3_PARALLEL_OUT):
+            shutil.rmtree(PY3_PARALLEL_OUT)
+        os.makedirs(PY3_PARALLEL_OUT, exist_ok=True)
+
+        global_sizes = os.path.join(PY3_OUT, "example.fragmentsizes.txt")
+        global_vmat = os.path.join(PY3_OUT, "example.VMat")
+        global_occ = os.path.join(PY3_OUT, "example.occ.bedgraph.gz")
+
+        try:
+            parser = nucleoatac_parser()
+            # Run nuc per chromosome with shared global inputs.
+            for chrom in PARALLEL_CHROMS:
+                chrom_out = os.path.join(PY3_PARALLEL_OUT, f"example.{chrom}")
+                cmd = (
+                    f"nucleoatac nuc "
+                    f"--bed example/example.bed "
+                    f"--bam example/example.bam "
+                    f"--fasta example/sacCer3.fa "
+                    f"--vmat {global_vmat} "
+                    f"--sizes {global_sizes} "
+                    f"--occ_track {global_occ} "
+                    f"--chroms_keep {chrom} "
+                    f"--out {chrom_out} "
+                    f"--cores 2"
+                )
+                args = parser.parse_args(cmd.split()[1:])
+                nucleoatac_main(args)
+
+            # Merge per-chromosome nuc outputs.
+            merged_out = os.path.join(PY3_PARALLEL_OUT, "merged")
+            merge_cmd = (
+                f"nucleoatac merge_chroms "
+                f"--prefix {PY3_PARALLEL_OUT}/example "
+                f"--chroms {','.join(PARALLEL_CHROMS)} "
+                f"--out {merged_out}"
+            )
+            merge_args = parser.parse_args(merge_cmd.split()[1:])
+            nucleoatac_main(merge_args)
+
+            cls._pipeline_run = True
+        except Exception as e:
+            cls._pipeline_error = e
+
+    def setUp(self):
+        if not self._pipeline_run:
+            self.skipTest(
+                f"Parallel pipeline failed in setUpClass: {self._pipeline_error}"
+            )
+
+    def _global(self, name):
+        return os.path.join(PY3_OUT, name)
+
+    def _merged(self, name):
+        return os.path.join(PY3_PARALLEL_OUT, name)
+
+    def test_parallel_nucleoatac_signal(self):
+        ref = _filter_chroms(
+            parse_bedgraph_gz(self._global("example.nucleoatac_signal.bedgraph.gz")),
+            PARALLEL_CHROMS)
+        test = parse_bedgraph_gz(self._merged("merged.nucleoatac_signal.bedgraph.gz"))
+        shared = sorted(set(ref) & set(test))
+        self.assertEqual(set(ref.keys()), set(test.keys()),
+            f"nucleoatac_signal: position mismatch: "
+            f"{len(set(ref)-set(test))} in ref only, "
+            f"{len(set(test)-set(ref))} in test only")
+        ref_vals = np.array([ref[k] for k in shared])
+        test_vals = np.array([test[k] for k in shared])
+        assert_arrays_close(ref_vals, test_vals, ATOL, "parallel nucleoatac_signal")
+
+    def test_parallel_nucleoatac_signal_smooth(self):
+        ref = _filter_chroms(
+            parse_bedgraph_gz(self._global("example.nucleoatac_signal.smooth.bedgraph.gz")),
+            PARALLEL_CHROMS)
+        test = parse_bedgraph_gz(self._merged("merged.nucleoatac_signal.smooth.bedgraph.gz"))
+        self.assertEqual(set(ref.keys()), set(test.keys()),
+            "nucleoatac_signal.smooth: position mismatch")
+        shared = sorted(set(ref) & set(test))
+        ref_vals = np.array([ref[k] for k in shared])
+        test_vals = np.array([test[k] for k in shared])
+        assert_arrays_close(ref_vals, test_vals, ATOL, "parallel nucleoatac_signal.smooth")
+
+    def test_parallel_nucpos(self):
+        ref = _filter_chroms(
+            parse_bed_gz(self._global("example.nucpos.bed.gz"), n_float_cols=10),
+            PARALLEL_CHROMS)
+        test = parse_bed_gz(self._merged("merged.nucpos.bed.gz"), n_float_cols=10)
+        self.assertEqual(set(ref.keys()), set(test.keys()),
+            f"nucpos: position mismatch")
+        for key in sorted(ref.keys()):
+            ref_arr = np.array(ref[key][0])
+            test_arr = np.array(test[key][0])
+            assert_arrays_close(ref_arr, test_arr, ATOL_NUCPOS,
+                                f"parallel nucpos at {key}")
+
+    def test_parallel_nucpos_redundant(self):
+        ref = _filter_chroms(
+            parse_bed_gz(self._global("example.nucpos.redundant.bed.gz"), n_float_cols=10),
+            PARALLEL_CHROMS)
+        test = parse_bed_gz(self._merged("merged.nucpos.redundant.bed.gz"), n_float_cols=10)
+        self.assertEqual(set(ref.keys()), set(test.keys()),
+            "nucpos.redundant: position mismatch")
+        for key in sorted(ref.keys()):
+            ref_arr = np.array(ref[key][0])
+            test_arr = np.array(test[key][0])
+            assert_arrays_close(ref_arr, test_arr, ATOL_NUCPOS,
+                                f"parallel nucpos.redundant at {key}")

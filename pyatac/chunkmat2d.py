@@ -62,16 +62,6 @@ class ChunkMat2D:
         """Save object in a text file"""
         head = ",".join(map(str,[self.chrom,self.start,self.end,self.lower,self.upper]))
         np.savetxt(filename,self.mat,delimiter="\t", header = head)
-    @staticmethod
-    def open(filename):
-        f = open(filename,'r')
-        header = f.readline()
-        f.close()
-        elements = header.rstrip('\n').lstrip("#").split(',')
-        mat = np.loadtxt(filename, skiprows=1)
-        new= ChunkMat2D(elements[0],elements[1],elements[2],elements[3])
-        new.assign(mat)
-        return new
     def getIns(self):
         """Collape matrix into insertions.  Will reduce span on chromosome"""
         pattern = np.zeros((self.upper-self.lower,self.upper + (self.upper-1)%2))

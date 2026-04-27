@@ -64,7 +64,7 @@ def _chunkCompare(chunk1, chunk2):
     else:
         if chunk1.start < chunk2.start:
             return -1
-        elif chunk2.start > chunk2.start:
+        elif chunk1.start > chunk2.start:
             return 1
         else:
             return 0
@@ -84,13 +84,6 @@ class ChunkList(list):
             raise ValueError("Wrong number of arguments")
         elif isinstance(args[0],Chunk):
             list.append(self, args[0])
-        else:
-            raise ValueError("Expecting Chunk")
-    def insert(self, *args):
-        if len(args)!=1:
-            raise ValueError("Wrong number of arguments")
-        elif isinstance(args[1],Chunk):
-            list.insert(self, args[0], args[1])
         else:
             raise ValueError("Expecting Chunk")
     def sort(self):

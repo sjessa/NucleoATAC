@@ -86,13 +86,6 @@ class Track(Chunk):
         self.vals = handle.read(self.chrom, self.start,
                                      self.end, empty = empty)
         handle.close()
-    def log(self, pseudo = 1):
-        """Log values.  Add psuedo count so values don't equal 0 before logging"""
-        if self.log:
-            print("Logging a track that is already log...")
-        adjusted = self.vals + pseudo
-        self.vals = np.log(adjusted)
-        self.log = True
     def exp(self):
         """Take exponent of values"""
         if not self.log:
@@ -110,10 +103,10 @@ class Track(Chunk):
             self.end = self.end - window_len//2
     def get(self, start = None, end = None, pos = None):
         """Obtain value of track at particular interval or position"""
-        if pos:
+        if pos is not None:
             try:
                 return self.vals[pos-self.start]
-            except:
+            except (IndexError, TypeError):
                 raise Exception("Looks like position given doesn't match track")
         else:
             if start is None:
