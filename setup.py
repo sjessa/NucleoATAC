@@ -14,7 +14,7 @@ except ImportError:
     ext_modules = []
 
 setup(
-    name='NucleoATAC',
+    name='NucleoATAC2',
     version='1.0.0',
     description='Python package for calling nucleosomes with ATAC-Seq',
     classifiers=[
