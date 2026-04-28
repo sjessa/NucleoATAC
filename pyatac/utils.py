@@ -5,7 +5,10 @@ General tools for dealing with ATAC-Seq data using Python.
 @author: Alicia Schep, Greenleaf Lab, Stanford University
 """
 
+import json
 import subprocess
+from datetime import datetime
+
 import numpy as np
 from scipy import signal
 import pysam
@@ -15,8 +18,21 @@ from copy import copy
 #Run shell command
 def shell_command(cmd):
     """Conduct shell command."""
-    output = subprocess.check_output(cmd, shell = True)
+    output = subprocess.check_output(cmd, shell = True).decode('utf-8')
     return(output)
+
+
+def save_params_json(filepath, step_name, params_dict):
+    """Save pipeline parameters to a JSON file."""
+    from nucleoatac import __version__
+    output = {
+        "nucleoatac_version": __version__,
+        "pipeline_step": step_name,
+        "timestamp": datetime.now().isoformat(),
+    }
+    output.update(params_dict)
+    with open(filepath, 'w') as f:
+        json.dump(output, f, indent=2, default=str)
 
 
 #Smoothing function
@@ -37,7 +53,7 @@ def smooth(sig, window_len, window='flat', sd = None, mode = 'valid',
     if window=='gaussian' and sd is None:
         sd = (window_len-1)/6.0
     if window=="gaussian":
-        w = signal.gaussian(window_len,sd)
+        w = signal.windows.gaussian(window_len,sd)
     if window=="flat":
         w = np.ones(window_len)
     sig_nonan = copy(sig)
@@ -116,7 +132,7 @@ def read_chrom_sizes_from_fasta(fastafile):
 def read_chrom_sizes_from_bam(bamfile):
     """get chromosome size information from bamfile"""
     out = {}
-    bam = pysam.Samfile(bamfile, "rb")
+    bam = pysam.AlignmentFile(bamfile, "rb")
     chr_lengths=bam.lengths
     chr_names=bam.references
     bam.close()
@@ -127,10 +143,10 @@ def read_chrom_sizes_from_bam(bamfile):
 def read_chrom_sizes(sizesFile):
     """get chromosome size information from chromosome sizes file"""
     out = {}
-    f = open(sizesFile,'r')
-    for line in f:
-        keys = line.rstrip("\n").split("\t")
-        out[keys[0]] = int(keys[1])
+    with open(sizesFile,'r') as f:
+        for line in f:
+            keys = line.rstrip("\n").split("\t")
+            out[keys[0]] = int(keys[1])
     return out
 
 

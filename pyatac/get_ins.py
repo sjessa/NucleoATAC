@@ -51,7 +51,7 @@ def _writeIns(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing insertion track\n')
         traceback.print_exc()
         print()
@@ -71,7 +71,7 @@ def get_ins(args, bases = 50000, splitsize = 1000):
     if args.bed is None:
         chrs = read_chrom_sizes_from_bam(args.bam)
         chunks = ChunkList.convertChromSizes(chrs, splitsize = splitsize)
-        sets = chunks.split(items = bases/splitsize)
+        sets = chunks.split(items = bases//splitsize)
     else:
         chunks = ChunkList.read(args.bed)
         chunks.merge()

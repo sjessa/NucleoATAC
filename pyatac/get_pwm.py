@@ -62,7 +62,7 @@ def get_pwm(args, bases = 50000, splitsize = 1000):
     chrs = read_chrom_sizes_from_fasta(args.fasta)
     if args.bed is None:
         chunks = ChunkList.convertChromSizes(chrs, splitsize = splitsize, offset = args.flank)
-        sets = chunks.split(items = bases/splitsize)
+        sets = chunks.split(items = bases//splitsize)
     else:
         chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = args.flank)
         sets = chunks.split(bases = bases)

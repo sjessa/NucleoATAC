@@ -1,14 +1,34 @@
 ###-----------Import modules---------------####
 
 import argparse
+import os
+import sys
 import nucleoatac.Magic
 from nucleoatac import __version__
+
+_FILE_ARGS = {'bed', 'bam', 'fragments', 'fasta', 'sizes', 'vmat', 'vplot',
+              'occ_track', 'calls', 'ins_track', 'occpeaks', 'nucpos'}
+
+def _validate_input_files(args):
+    """Check that all file arguments point to existing files."""
+    missing = []
+    for name in vars(args):
+        if name in _FILE_ARGS:
+            path = getattr(args, name)
+            if path is not None and not os.path.exists(path):
+                missing.append((name, path))
+    if missing:
+        for name, path in missing:
+            print("Error: file not found: " + path + " (--" + name + ")",
+                  file=sys.stderr)
+        sys.exit(1)
 
 def nucleoatac_main(args):
     """The Main function for calling nucleoatac
 
     """
     #Parse options...
+    _validate_input_files(args)
     call = args.call
     parser = nucleoatac_parser()
     if call == "occ":
@@ -27,30 +47,41 @@ def nucleoatac_main(args):
         from nucleoatac.merge import run_merge
         print('---------Merging----------------------------------------------------------------')
         run_merge(args)
+    elif call == "merge_chroms":
+        from nucleoatac.merge import run_merge_chroms
+        print('---------Merging per-chromosome results-----------------------------------------')
+        run_merge_chroms(args)
     elif call == "nfr":
         from nucleoatac.run_nfr import run_nfr
         print('---------Calling NFR positions--------------------------------------------------')
         run_nfr(args)
     elif call == "run":
 
-        occ_args = parser.parse_args(map(str,['occ','--bed', args.bed,
-                                            '--bam', args.bam,
-                                            '--fragments', args.fragments,
-                                            '--fasta', args.fasta, '--pwm', args.pwm,
-                                            '--chroms_keep', args.chroms_keep,
-                                            '--out',args.out,
-                                            '--cores', args.cores]))
+        occ_args_list = ['occ','--bed', args.bed,
+                         '--fasta', args.fasta, '--pwm', args.pwm,
+                         '--out', args.out,
+                         '--cores', str(args.cores)]
+        if args.bam is not None:
+            occ_args_list.extend(['--bam', args.bam])
+        else:
+            occ_args_list.extend(['--fragments', args.fragments])
+        if args.chroms_keep is not None:
+            occ_args_list.extend(['--chroms_keep', args.chroms_keep])
+        occ_args = parser.parse_args(occ_args_list)
         
         vprocess_args = parser.parse_args(['vprocess','--sizes',args.out+'.nuc_dist.txt','--out',args.out])
 
         nuc_args_list = ['nuc','--bed', args.bed,
-                         '--fasta', args.fasta, 
-                         '--bam',args.bam,
-                         '--fragments',args.fragments,
+                         '--fasta', args.fasta,
                          '--out',args.out,'--cores', str(args.cores),
-                         '--chroms_keep', args.chroms_keep,
                         '--occ_track', args.out + '.occ.bedgraph.gz','--vmat', args.out + '.VMat',
-                        '--fasta', args.fasta, '--pwm', args.pwm, '--sizes', args.out + '.fragmentsizes.txt']
+                        '--pwm', args.pwm, '--sizes', args.out + '.fragmentsizes.txt']
+        if args.bam is not None:
+            nuc_args_list.extend(['--bam', args.bam])
+        else:
+            nuc_args_list.extend(['--fragments', args.fragments])
+        if args.chroms_keep is not None:
+            nuc_args_list.extend(['--chroms_keep', args.chroms_keep])
         
         if args.write_all:
             nuc_args_list.extend(['--write_all'])
@@ -60,9 +91,14 @@ def nucleoatac_main(args):
         merge_args = parser.parse_args(['merge','--occpeaks',args.out +'.occpeaks.bed.gz','--nucpos',args.out+'.nucpos.bed.gz',
                                         '--out',args.out])
         
-        nfr_args = parser.parse_args(['nfr','--bed', args.bed, '--occ_track', args.out + '.occ.bedgraph.gz', '--calls', 
-                                        args.out + '.nucmap_combined.bed.gz','--out',args.out, '--fasta', args.fasta, 
-                                        '--pwm', args.pwm , '--bam', args.bam])
+        nfr_args_list = ['nfr','--bed', args.bed, '--occ_track', args.out + '.occ.bedgraph.gz', '--calls',
+                                        args.out + '.nucmap_combined.bed.gz','--out',args.out, '--fasta', args.fasta,
+                                        '--pwm', args.pwm]
+        if args.bam is not None:
+            nfr_args_list.extend(['--bam', args.bam])
+        else:
+            nfr_args_list.extend(['--fragments', args.fragments])
+        nfr_args = parser.parse_args(nfr_args_list)
         
         from nucleoatac.run_occ import run_occ
         from nucleoatac.run_vprocess import run_vprocess
@@ -102,6 +138,8 @@ def nucleoatac_parser():
     add_nuc_parser( subparsers)
     
     add_merge_parser( subparsers)
+
+    add_merge_chroms_parser( subparsers)
 
     add_nfr_parser( subparsers)
 
@@ -164,6 +202,18 @@ def add_merge_parser( subparsers):
                         help = "minimum separation between call")
     group2.add_argument('--min_occ', metavar = 'min_occ', default = 0.1,
                         help = "minimum lower bound occupancy of nucleosomes to be considered for excluding NFR. default is 0.1")
+
+def add_merge_chroms_parser( subparsers):
+    """Add argument parser for merge_chroms utility"""
+    parser = subparsers.add_parser("merge_chroms",
+        help="nucleoatac function: Merge per-chromosome NucleoATAC outputs into a single set of files")
+    group1 = parser.add_argument_group('Required', 'Necessary arguments')
+    group1.add_argument('--prefix', metavar='prefix', required=True,
+                        help="Per-chromosome output prefix. Expects files named <prefix>.<chrom>.<suffix>")
+    group1.add_argument('--chroms', metavar='chr1,chr2,...', required=True,
+                        help="Comma-separated list of chromosomes to merge, in desired output order")
+    group1.add_argument('--out', metavar='out_basename', required=True,
+                        help="Output file basename for merged results")
 
 def add_nfr_parser( subparsers):
     """Add argument parser for nfr utility

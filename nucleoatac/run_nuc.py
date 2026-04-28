@@ -9,10 +9,11 @@ Script to call nucleosome positions-- track making, nucleosome calling, and nfr 
 #mpl.use('PS')
 import multiprocessing as mp
 import numpy as np
+import os
 import traceback
 import itertools
 import pysam
-from pyatac.utils import shell_command,read_chrom_sizes_from_fasta
+from pyatac.utils import shell_command,read_chrom_sizes_from_fasta,save_params_json
 from pyatac.chunk import ChunkList
 from nucleoatac.NucleosomeCalling import NucChunk, NucParameters
 from pyatac.fragmentsizes import FragmentSizes
@@ -49,7 +50,7 @@ def _writeNucSig(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing NucleoATAC signal track\n')
         traceback.print_exc()
         print()
@@ -64,7 +65,7 @@ def _writeBackground(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing NucleoATAC background track\n')
         traceback.print_exc()
         print()
@@ -79,7 +80,7 @@ def _writeSmooth(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing smoothed NucleoATAC signal track\n')
         traceback.print_exc()
         print()
@@ -93,7 +94,7 @@ def _writeRaw(track_queue, out):
         for track in iter(track_queue.get, 'STOP'):
             track.write_track(out_handle)
             track_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing un-normalized NucleoATAC signal track\n')
         traceback.print_exc()
         print()
@@ -110,7 +111,7 @@ def _writeNucPos(pos_queue, out):
             for pos in poslist:
                 pos.write(out_handle)
             pos_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing nucleosome position file\n')
         traceback.print_exc()
         print()
@@ -125,7 +126,7 @@ def _writeNucPosRedundant(pos_queue, out):
             for pos in poslist:
                 pos.write(out_handle)
             pos_queue.task_done()
-    except Exception, e:
+    except Exception as e:
         print('Caught exception when writing redundant nucleosome position file\n')
         traceback.print_exc()
         print()
@@ -158,12 +159,12 @@ def run_nuc(args):
     if args.chroms_keep is not None:
         # parse comma separated list of chromosomes
         chroms_keep = args.chroms_keep.split(',')
-        print "@ NOTE: restricting analysis to chromosomes: " + ", ".join(chroms_keep)
+        print("@ NOTE: restricting analysis to chromosomes: " + ", ".join(chroms_keep))
     else:
         chroms_keep = None
 
-    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = vmat.mat.shape[1] + vmat.upper/2 + max(pwm.up,pwm.down) + args.nuc_sep/2, min_length = args.nuc_sep * 2, chroms_keep = chroms_keep)
-    chunks.slop(chrs, up = args.nuc_sep/2, down = args.nuc_sep/2)
+    chunks = ChunkList.read(args.bed, chromDict = chrs, min_offset = vmat.mat.shape[1] + vmat.upper//2 + max(pwm.up,pwm.down) + args.nuc_sep//2, min_length = args.nuc_sep * 2, chroms_keep = chroms_keep)
+    chunks.slop(chrs, up = args.nuc_sep//2, down = args.nuc_sep//2)
     chunks.merge()
     maxQueueSize = args.cores*10
 
@@ -188,6 +189,30 @@ def run_nuc(args):
                            min_z = args.min_z, min_lr = args.min_lr , atac = args.atac)
     
     params.print_parameters()
+    save_params_json(args.out + '.nuc.params.json', 'nuc', {
+        "bed": args.bed,
+        "out": args.out,
+        "vmat": args.vmat,
+        "vmat_lower": params.lower,
+        "vmat_upper": params.upper,
+        "vmat_window": params.window,
+        "sizes": args.sizes,
+        "fasta": params.fasta,
+        "pwm": args.pwm,
+        "input_file": params.input_file,
+        "input_type": params.input_type,
+        "occ_track": params.occ_track,
+        "atac": params.atac,
+        "min_reads": params.min_reads,
+        "min_z": params.min_z,
+        "min_lr": params.min_lr,
+        "smooth_sd": params.smooth_sd,
+        "redundant_sep": params.redundant_sep,
+        "nonredundant_sep": params.nonredundant_sep,
+        "cores": args.cores,
+        "write_all": args.write_all,
+        "chroms_keep": getattr(args, 'chroms_keep', None),
+    })
 
     sets = chunks.split(items = args.cores*5)
     pool1 = mp.Pool(processes = max(1,args.cores-1))
@@ -222,11 +247,11 @@ def run_nuc(args):
         write_processes[i].join()
         if i not in ['nucpos','nucpos.redundant']:
             pysam.tabix_compress(args.out + '.' + i + '.bedgraph', args.out +  '.' + i + '.bedgraph.gz',force = True)
-            shell_command('rm ' + args.out +  '.' + i + '.bedgraph')
+            os.remove(args.out + '.' + i + '.bedgraph')
             pysam.tabix_index(args.out +  '.' + i + '.bedgraph.gz', preset = "bed", force = True)
         else:
             pysam.tabix_compress(args.out + '.' + i + '.bed', args.out +  '.' + i + '.bed.gz',force = True)
-            shell_command('rm ' + args.out +  '.' + i + '.bed')
+            os.remove(args.out + '.' + i + '.bed')
             pysam.tabix_index(args.out +  '.' + i + '.bed.gz', preset = "bed", force = True)
  
 

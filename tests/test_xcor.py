@@ -17,7 +17,7 @@ class Test_xcor(TestCase):
         self.vmat = V.VMat.open('example/example.VMat')
         self.vmat = V.VMat.open('example/example.VMat')
         self.mat = FragmentMat2D(self.chunk.chrom,self.chunk.start-self.vmat.w,self.chunk.end+self.vmat.w,self.vmat.lower,self.vmat.upper)
-        self.mat.makeFragmentMat('example/example.bam')
+        self.mat.makeFragmentMat('example/example.bam', 'bam')
         self.signal = Nuc.SignalTrack(self.chunk.chrom,self.chunk.start,self.chunk.end)
         self.signal.calculateSignal(self.mat, self.vmat)
     def test_signal_calc1(self):

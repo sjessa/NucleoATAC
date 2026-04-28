@@ -13,7 +13,7 @@ import numpy as np
 import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()})
 from pyatac.chunk import ChunkList
 from pyatac.chunkmat2d import FragmentMat2D
-import VMat as V
+from . import VMat as V
 from multiprocessing import Pool
 import itertools
 import traceback

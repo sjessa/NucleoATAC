@@ -3,23 +3,18 @@ import pyatac.seq as seq
 import numpy as np
 cimport numpy as np
 cimport cython
-from pysam.libcalignmentfile cimport AlignmentFile, AlignedSegment
-from pysam.libcfaidx cimport FastaFile
+from pysam import AlignmentFile
 
-DTYPE = np.float
+DTYPE = np.float64
 ctypedef np.float_t DTYPE_t
 
-
-#### Import needed modules #####
-#import pysam
 
 @cython.boundscheck(False)
 def makeFragmentMat(str bamfile, str chrom, int start, int end, int lower, int upper, int atac = 1):
     cdef int nrow = upper - lower
     cdef int ncol = end - start
     cdef np.ndarray[DTYPE_t, ndim=2] mat = np.zeros( (nrow, ncol), dtype = DTYPE)
-    cdef AlignmentFile bamHandle = AlignmentFile(bamfile)
-    cdef AlignedSegment read
+    bamHandle = AlignmentFile(bamfile)
     cdef int l_pos, ilen, row, col
     for read in bamHandle.fetch(chrom, max(0, start - upper), end + upper):
         if read.is_proper_pair and not read.is_reverse:
@@ -33,7 +28,7 @@ def makeFragmentMat(str bamfile, str chrom, int start, int end, int lower, int u
                 l_pos = read.pos
                 ilen = abs(read.template_length)
             row = ilen - lower
-            col = (ilen-1)/2 + l_pos - start
+            col = (ilen-1)//2 + l_pos - start
             if col >= 0 and col < ncol and row < nrow and row >= 0:
                 mat[row, col] += 1
     bamHandle.close()
@@ -43,8 +38,7 @@ def makeFragmentMat(str bamfile, str chrom, int start, int end, int lower, int u
 def getInsertions(str bamfile, str chrom, int start, int end, int lower, int upper, int atac = 1):
     cdef int npos = end - start
     cdef np.ndarray[DTYPE_t, ndim=1] mat = np.zeros(npos, dtype = DTYPE)
-    cdef AlignmentFile bamHandle = AlignmentFile(bamfile)
-    cdef AlignedSegment read
+    bamHandle = AlignmentFile(bamfile)
     cdef int l_pos, ilen, r_pos
     for read in bamHandle.fetch(chrom, max(0, start - upper), end + upper):
         if read.is_proper_pair and not read.is_reverse:
@@ -72,8 +66,7 @@ def getStrandedInsertions(str bamfile, str chrom, int start, int end, int lower,
     cdef int npos = end - start
     cdef np.ndarray[DTYPE_t, ndim=1] matplus = np.zeros(npos, dtype = DTYPE)
     cdef np.ndarray[DTYPE_t, ndim=1] matminus = np.zeros(npos, dtype = DTYPE)
-    cdef AlignmentFile bamHandle = AlignmentFile(bamfile)
-    cdef AlignedSegment read
+    bamHandle = AlignmentFile(bamfile)
     cdef int l_pos, ilen, r_pos
     for read in bamHandle.fetch(chrom, max(0, start - upper), end + upper):
         if read.is_proper_pair and not read.is_reverse:
@@ -99,10 +92,9 @@ def getStrandedInsertions(str bamfile, str chrom, int start, int end, int lower,
 
 @cython.boundscheck(False)
 def getAllFragmentSizes(str bamfile, int lower, int upper, int atac = 1):
-    cdef np.ndarray[DTYPE_t, ndim =1] sizes = np.zeros(upper - lower, dtype= np.float)
+    cdef np.ndarray[DTYPE_t, ndim =1] sizes = np.zeros(upper - lower, dtype= np.float64)
     # loop over samfile
-    cdef AlignmentFile bamHandle = AlignmentFile(bamfile)
-    cdef AlignedSegment read
+    bamHandle = AlignmentFile(bamfile)
     cdef int ilen
     for read in bamHandle:
           if read.is_proper_pair and not read.is_reverse:
@@ -121,10 +113,9 @@ def getAllFragmentSizes(str bamfile, int lower, int upper, int atac = 1):
 
 @cython.boundscheck(False)
 def getFragmentSizesFromChunkList(chunks, str bamfile, int lower, int upper, int atac = 1):
-    cdef np.ndarray[DTYPE_t, ndim =1] sizes = np.zeros(upper - lower, dtype= np.float)
+    cdef np.ndarray[DTYPE_t, ndim =1] sizes = np.zeros(upper - lower, dtype= np.float64)
     # loop over samfile
-    cdef AlignmentFile bamHandle = AlignmentFile(bamfile)
-    cdef AlignedSegment read
+    bamHandle = AlignmentFile(bamfile)
     cdef int ilen, l_pos, center
     for chunk in chunks:
         for read in bamHandle.fetch(chunk.chrom, max(0, chunk.start - upper), chunk.end + upper):
@@ -138,9 +129,8 @@ def getFragmentSizesFromChunkList(chunks, str bamfile, int lower, int upper, int
                 else:
                     l_pos = read.pos
                     ilen = abs(read.template_length)
-                center = l_pos + (ilen-1)/2
+                center = l_pos + (ilen-1)//2
                 if ilen < upper and ilen >= lower and center >= chunk.start and center < chunk.end:
                     sizes[ilen - lower]+=1
     bamHandle.close()
     return sizes
-

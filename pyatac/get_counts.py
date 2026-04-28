@@ -24,7 +24,7 @@ def get_counts(args):
     if args.out is None:
         args.out = '.'.join(os.path.basename(args.bed).split('.')[0:-1])  
     chunks = ChunkList.read(args.bed)
-    mat = np.zeros(len(chunks), dtype=np.int)
+    mat = np.zeros(len(chunks), dtype=np.intp)
     bamHandle = AlignmentFile(args.bam)
     j = 0
     for chunk in chunks:

@@ -8,8 +8,7 @@ import numpy as np
 from scipy import optimize, signal
 from copy import copy
 from bisect import bisect_left
-import pyximport; pyximport.install(setup_args={"include_dirs":np.get_include()})
-from nucleoatac.multinomial_cov import calculateCov
+from nucleoatac.cov_utils import calculateCov
 from nucleoatac.Occupancy import OccupancyTrack
 from pyatac.tracks import Track, CoverageTrack
 from pyatac.chunk import Chunk
@@ -79,7 +78,7 @@ class SignalDistribution:
         sim_mat = np.reshape(sim_vect, self.vmat.mat.shape)
         return sim_mat
     def simulateDist(self, numiters = 1000):
-        self.scores = map(lambda x: np.sum(self.simulateReads() * self.vmat.mat),range(numiters))
+        self.scores = list(map(lambda x: np.sum(self.simulateReads() * self.vmat.mat),range(numiters)))
     def analStd(self):
         flatv = np.ravel(self.vmat.mat)
         var = calculateCov(self.probs, flatv, self.reads)
@@ -117,8 +116,8 @@ class Nucleosome(Chunk):
         nuc_model = nuctrack.params.vmat.mat * bias_mat
         nuc_model = nuc_model / np.sum(nuc_model)
         null_model = null_mat / np.sum(null_mat)
-        nuc_lik = np.sum(np.log(nuc_model) * mat)
-        null_lik = np.sum(np.log(null_model) * mat)
+        nuc_lik = np.sum(np.log(np.clip(nuc_model, 1e-300, None)) * mat)
+        null_lik = np.sum(np.log(np.clip(null_model, 1e-300, None)) * mat)
         self.lr = nuc_lik - null_lik
     def getZScore(self, nuctrack):
         s = SignalDistribution(self.start, nuctrack.params.vmat, nuctrack.bias_mat,
@@ -130,7 +129,7 @@ class Nucleosome(Chunk):
             self.occ = nuctrack.occ.get(pos = self.start)
             self.occ_lower = nuctrack.occ_lower.get(pos = self.start)
             self.occ_upper = nuctrack.occ_upper.get(pos = self.start)
-        except:
+        except Exception:
             self.occ = np.nan
             self.occ_lower = np.nan
             self.occ_upper = np.nan
@@ -139,7 +138,7 @@ class Nucleosome(Chunk):
             """Add several normal distributions together"""
             l = len(x)
             fit = np.zeros(l)
-            i = len(params)/3
+            i = len(params)//3
             for j in range(i):
                 fit += norm(x,params[j*3],params[3*j+1],params[3*j+2])
             return fit
@@ -156,21 +155,21 @@ class Nucleosome(Chunk):
         allnucs = nuctrack.sorted_nuc_keys
         x = bisect_left(allnucs,index)
         if x == 0:
-            left = index - nuctrack.params.nonredundant_sep/3
-            means = (nuctrack.params.nonredundant_sep/3,)
+            left = index - nuctrack.params.nonredundant_sep//3
+            means = (nuctrack.params.nonredundant_sep//3,)
         elif index - allnucs[x-1] < nuctrack.params.nonredundant_sep:
             left = allnucs[x-1]
             means = (index - allnucs[x-1],0)
         else:
-            left = index - nuctrack.params.nonredundant_sep/3
-            means = (nuctrack.params.nonredundant_sep/3,)
+            left = index - nuctrack.params.nonredundant_sep//3
+            means = (nuctrack.params.nonredundant_sep//3,)
         if x == len(allnucs)-1:
-            right = index + nuctrack.params.nonredundant_sep/3 + 1
+            right = index + nuctrack.params.nonredundant_sep//3 + 1
         elif allnucs[x+1] - index < nuctrack.params.nonredundant_sep:
             right = allnucs[x+1]
             means += (allnucs[x+1] - left,)
         else:
-            right = index + nuctrack.params.nonredundant_sep/3 +1
+            right = index + nuctrack.params.nonredundant_sep//3 +1
         sig = nuctrack.smoothed.vals[left:right]
         sig[sig<0] = 0
         if len(means)==1:
@@ -228,24 +227,24 @@ class NucParameters:
 
     def print_parameters(self):
         """Prints the parameters of the NucParameters class."""
-        print "NucParameters:"
-        print "  atac: %s" % self.atac
-        print "  vmat lower bound: %d" % self.lower
-        print "  vmat upper bound: %d" % self.upper
-        print "  vmat window size: %d" % self.window
-        
-        print "  fragmentsizes: %s" % str(self.fragmentsizes)
-        print "  input_file: %s" % self.input_file
-        print "  input_type: %s" % self.input_type
-        print "  min_reads: %d" % self.min_reads
-        print "  min_z: %f" % self.min_z
-        print "  min_lr: %f" % self.min_lr
-        print "  smooth_sd: %d" % self.smooth_sd
-        print "  redundant_sep: %d" % self.redundant_sep
-        print "  nonredundant_sep: %d" % self.nonredundant_sep
-        print "  fasta: %s" % self.fasta
-        print "  pwm file: %s" % self.pwm
-        print "  occ_track: %s" % self.occ_track
+        print("NucParameters:")
+        print("  atac: %s" % self.atac)
+        print("  vmat lower bound: %d" % self.lower)
+        print("  vmat upper bound: %d" % self.upper)
+        print("  vmat window size: %d" % self.window)
+
+        print("  fragmentsizes: %s" % str(self.fragmentsizes))
+        print("  input_file: %s" % self.input_file)
+        print("  input_type: %s" % self.input_type)
+        print("  min_reads: %d" % self.min_reads)
+        print("  min_z: %f" % self.min_z)
+        print("  min_lr: %f" % self.min_lr)
+        print("  smooth_sd: %d" % self.smooth_sd)
+        print("  redundant_sep: %d" % self.redundant_sep)
+        print("  nonredundant_sep: %d" % self.nonredundant_sep)
+        print("  fasta: %s" % self.fasta)
+        print("  pwm file: %s" % self.pwm)
+        print("  occ_track: %s" % self.occ_track)
 
 
 
@@ -262,15 +261,15 @@ class NucChunk(Chunk):
 
     def getFragmentMat(self):
         # modified to take in either BAM or fragments file as input
-        self.mat = FragmentMat2D(self.chrom, self.start - max(self.params.window,self.params.upper/2+1),
-                                 self.end + max(self.params.window,self.params.upper/2+1), 0, self.params.upper, atac = self.params.atac)
+        self.mat = FragmentMat2D(self.chrom, self.start - max(self.params.window,self.params.upper//2+1),
+                                 self.end + max(self.params.window,self.params.upper//2+1), 0, self.params.upper, atac = self.params.atac)
         self.mat.makeFragmentMat(self.params.input_file, self.params.input_type)
 
     def makeBiasMat(self):
         self.bias_mat = BiasMat2D(self.chrom, self.start - self.params.window,
                                  self.end + self.params.window, 0, self.params.upper)
-        bias_track = InsertionBiasTrack(self.chrom, self.start - self.params.window - self.params.upper/2,
-                                  self.end + self.params.window + self.params.upper/2 + 1, log = True)
+        bias_track = InsertionBiasTrack(self.chrom, self.start - self.params.window - self.params.upper//2,
+                                  self.end + self.params.window + self.params.upper//2 + 1, log = True)
         if self.params.fasta is not None:
             bias_track.computeBias(self.params.fasta, self.params.chrs, self.params.pwm)
             self.bias_mat.makeBiasMat(bias_track)
@@ -330,7 +329,7 @@ class NucChunk(Chunk):
         #find peaks in normalized sigal
         cands1 = call_peaks(combined, min_signal = 0,
                                 sep = self.params.redundant_sep,
-                                boundary = self.params.nonredundant_sep/2, order = self.params.redundant_sep/2)
+                                boundary = self.params.nonredundant_sep//2, order = self.params.redundant_sep//2)
         for i in cands1:
             nuc = Nucleosome(i + self.start, self)
             if nuc.nuc_cov > self.params.min_reads:
@@ -342,7 +341,7 @@ class NucChunk(Chunk):
                         self.nuc_collection[i] = nuc
         self.sorted_nuc_keys = np.array(sorted(self.nuc_collection.keys()))
         self.nonredundant = reduce_peaks( self.sorted_nuc_keys,
-                                            map(lambda x: self.nuc_collection[x].z, self.sorted_nuc_keys),
+                                            list(map(lambda x: self.nuc_collection[x].z, self.sorted_nuc_keys)),
                                                 self.params.nonredundant_sep)
         self.redundant = np.setdiff1d(self.sorted_nuc_keys, self.nonredundant)
 
@@ -376,7 +375,7 @@ class NucChunk(Chunk):
 
     def removeData(self):
         """remove data from chunk-- deletes all attributes"""
-        names = self.__dict__.keys()
+        names = list(self.__dict__.keys())
         for name in names:
             delattr(self,name)
 

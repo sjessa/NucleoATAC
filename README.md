@@ -1,116 +1,175 @@
-# NucleoATAC
+# NucleoATAC2
 
-## Update 2024/08/26
+**NucleoATAC** infers nucleosome positions and occupancy from ATAC-seq data using a probabilistic V-plot model. NucleoATAC2 is a fork of [GreenleafLab/NucleoATAC](https://github.com/GreenleafLab/NucleoATAC) (Alicia Schep, Greenleaf Lab). We did an AI-assisted port to Python 3, extended the package to accept tabix-indexed fragment files, and substantially improved runtime through optimization and parallelization.
 
-This is a fork of the NucleoATAC package authored by Alicia Schep in the Greenleaf Lab,
-a package for calling nucleosome occupancy from ATAC-seq data.
-We modify the package to take fragments files as inputs instead of BAM files.
-This fork is not being officially maintained. Please refer to the original package
-for the last stable version.
+> Schep et al. (2015) *Structured nucleosome fingerprints enable high-resolution mapping of chromatin architecture within regulatory regions.* Genome Research. [doi:10.1101/gr.192294.115](http://genome.cshlp.org/content/25/11/1757)
 
 
-### Installation
+## Method overview
 
-1. Create a conda environment
+NucleoATAC models the size and position distribution of ATAC-seq fragments around candidate nucleosome positions. The core idea is that 1) nucleosomal DNA is typically associated with longer ATAC-seq fragments, and therefore 2) nucleosomal DNA produces a characteristic **V-plot** — a 2D histogram of fragment midpoint position vs. fragment size — with nucleosome-sized fragments (≥150 bp) centered on the dyad and sub-nucleosomal fragments (NFR) flanking it.
 
-```bash
-# loading the module first seems to be necessary for properly loading cython
-module load python/2.7.13
-conda create -n "nucleoatac" python=2.7.13
-conda activate nucleoatac
+The pipeline has five steps:
+
+```
+occ → vprocess → nuc → merge → nfr
 ```
 
-2. Install the package
+| Step | Command | What it does |
+|------|---------|-------------|
+| Occupancy | `nucleoatac occ` | Fits a two-component mixture model (NFR + nucleosomal) to the fragment size distribution at each peak. Reports per-position occupancy (0–1) and confidence bounds. |
+| V-plot processing | `nucleoatac vprocess` | Normalizes the V-plot template to the observed nucleosomal insert size distribution. |
+| Nucleosome calling | `nucleoatac nuc` | Convolves the normalized V-plot over each peak. Reports a nucleosome signal track, smoothed signal, and discrete peak calls with LLR scores. |
+| Merge | `nucleoatac merge` | Combines occupancy peaks and nucleosome position calls into a single unified set. |
+| NFR calling | `nucleoatac nfr` | Identifies nucleosome-free regions between adjacent nucleosome calls. |
+
+**Inputs:** ATAC-seq alignment (BAM or tabix-indexed BED fragments), peak regions (BED), reference genome (FASTA).
+**Outputs:** Occupancy track, nucleosome signal track, nucleosome position calls, NFR calls — all as gzipped, tabix-indexed bedgraph/BED files.
+
+
+## Installation
+
+Clone the repository, and then:
 
 ```bash
-cd NucleoATAC
+conda create -n nucleoatac python=3.12
+conda activate nucleoatac
 pip install --editable .
 ```
 
-**_NOTE_**: to edit the package and install the new version, update the version
-number in `setup.py` for documentation, then re-run the above pip command.
-Test the install with `pyatac --version`.
+Verify:
 
-
-### Updates to functionality
-
-**_NOTE_**: `nucleoatac run` doesn't work with the modifications for fragment
-sizes yet. Run commands individually as per [the docs](https://nucleoatac.readthedocs.io/en/latest/nucleoatac/).
-
-#### Allowing fragments files as input
-- Goal: allow nucleosome calling to be performed with tabix-indexed compressed fragments files in BED format
-- The `pyatac.fragmentsizes` module has been updated so that the `FragmentSizes` class
-  can now accept a fragments file instead of a BAM file for calculation of the fragment
-  size distribution. This makes use of new functions in the `nucleoatac.fragments_handling` module.
-- The following commands now can now accept a fragments file instead of BAM file:
-  - `pyatac sizes`
-  - `nucleoatac occ` 
-  - `nucleoatac nuc`
-- The `pyatac.chunkmat2d.FragmentMat2D` module has been updated so that the `FragmentMat2D` class
-  can now accept a fragments file instead of a BAM file for calculation of the fragment
-  size distribution, which will fetch the chunk region from the fragments file
-  using `pysam`'s tabix interface, and then populate the 2D matrix
-- Add chunk handling for the fragemnts file as well
-- When commands required BAM files for calculation of fragment sizes, the fragment sizes output
-  from previous commands is now required instead
-
-
-#### Restrict analysis to chromosomes of interest
-- Goal: calculate the fragment size distribution on the whole dataset, but restrict
-  the occupancy calculation to a subset of chromosomes to allow users to debug
-  or further parallelize the analysis
-- The `nucleotac occ` command now accepts a `--chroms_keep` argument that allows users
-  to specify a list of chromosomes to restrict the occupancy calculation to, and a chunk
-  list will only be generated for these chromosomes.
-- This can be used to manually parallelize the runs, or do a quick run for debugging
-
-
-#### Misc
-- `nucleoatac occ` and `pyatac sizes` changed to produce .pdf instead of .eps files
-- More verbose messaging added in `nucleoatac occ` and `nucleoatac nuc`
-
-
-
-### Timing
-
-For reference, running only on chr1 (with 7,267,633 fragments) on 4 cores and 64G of memory took about 14 minutes.
-
-```
-Command run:  /path/to/.local/bin/nucleoatac occ --fragments ../data/Eye_c11__sorted.tsv.gz --bed ../data/Eye_c11__peaks_overlap_filtered.narrowPeak --fasta
- /path/to/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta --out ../out/04-Eye_c11__chr1 --cores 4 --chroms_keep chr
-1
-nucleoatac version 0.3.4
-start run at: 2024-08-27 14:48
----------Computing Occupancy and Nucleosomal Insert Distribution----------------
-@ NOTE: restricting analysis to chromosomes: chr1
-@ calculating fragment sizes...
-@ fitting fragment size distribution...
-@ calculating occupancy...
-@ compressing and indexing output files...
-@ making figure
-@ done.
-end run at: 2024-08-27 15:02
+```bash
+nucleoatac --version
+pyatac --version
 ```
 
 
-## Previously
+## Quick start
 
-**This package is no longer being actively maintained; feel free to post issues that others in the community may respond to, but this package will likely not be updated further. Additionally, if anyone wants to maintain a fork of the package or has developed an alternative package for similar purposes, would be happy to link to that repo here.**
+```bash
+# Run the full pipeline in one command
+nucleoatac run \
+  --bed peaks.bed \
+  --bam data.bam \
+  --fasta genome.fa \
+  --out results/sample \
+  --cores 8
+```
 
-Python package for calling nucleosomes using ATAC-seq data.
-Also includes general scripts for working with paired-end ATAC-seq data (or potentially other paired-end data).
+Or run steps individually for more control (see [readthedocs](http://nucleoatac.readthedocs.org/en/latest/) for options):
 
-Please cite our paper at [Genome Research](http://genome.cshlp.org/content/25/11/1757) if you use this tool in your research.
+```bash
+nucleoatac occ      --bed peaks.bed --bam data.bam --fasta genome.fa --out sample --cores 8
+nucleoatac vprocess --sizes sample.nuc_dist.txt --out sample
+nucleoatac nuc      --bed peaks.bed --bam data.bam --fasta genome.fa \
+                    --vmat sample.VMat --occ_track sample.occ.bedgraph.gz --out sample --cores 8
+nucleoatac merge    --occpeaks sample.occpeaks.bed.gz --nucpos sample.nucpos.bed.gz --out sample
+nucleoatac nfr      --bed peaks.bed --bam data.bam --fasta genome.fa \
+                    --occ_track sample.occ.bedgraph.gz --calls sample.nucmap_combined.bed.gz --out sample
+```
 
-Please use GitHub Issues to bring up any errors that occur with software rather than emailing authors.
 
-Note on Versions:  
+## New features in this fork
 
-* version 0 represents code used for biorxiv manuscript
-* version 0.2.1 was used for Genome Research manuscript (See Supplemental Information as well)
+### Fragment file support
 
-Documentation  can be found at http://nucleoatac.readthedocs.org/en/latest/
+Commands that previously required a BAM file now accept a **tabix-indexed BED fragments file** via `--fragments`:
 
-If you want to easily read in NucleoATAC outputs into R for further processing or exploration, check out [NucleoATACR](https://github.com/GreenleafLab/NucleoATACR/)
+```bash
+nucleoatac occ --fragments sample.fragments.tsv.gz --bed peaks.bed --fasta genome.fa --out sample
+nucleoatac nuc --fragments sample.fragments.tsv.gz ...
+pyatac sizes   --fragments sample.fragments.tsv.gz --bed peaks.bed --out sample
+```
 
-Currently NucleoATAC only supports Python 2.7 (No Python 3).
+The fragments file is expected to be coordinate-sorted, bgzip-compressed, and tabix-indexed.
+
+### HPC parallelization
+
+Both `occ` and `nuc` accept `--sizes` (a pre-computed fragment size distribution) and `--chroms_keep` (restrict to one chromosome), enabling parallel array jobs across chromosomes.
+
+**Option A — parallel `nuc` only** (recommended; `occ` already parallelizes internally):
+
+```bash
+# Phase 1: global occ + vprocess (once, uses internal multiprocessing)
+nucleoatac occ     --bed peaks.bed --bam data.bam --fasta genome.fa --out global --cores 8
+nucleoatac vprocess --sizes global.nuc_dist.txt --out global
+
+# Phase 2: per-chromosome nuc (one HPC job per chromosome)
+for chrom in chr1 chr2 ...; do
+  nucleoatac nuc --bed peaks.bed --bam data.bam --fasta genome.fa \
+    --chroms_keep $chrom \
+    --sizes     global.fragmentsizes.txt \
+    --vmat      global.VMat \
+    --occ_track global.occ.bedgraph.gz \
+    --out per_chrom/$chrom --cores 4 &
+done; wait
+
+# Phase 3: merge + downstream (once)
+nucleoatac merge_chroms --prefix per_chrom/chr --chroms chr1,chr2,... --out merged
+nucleoatac merge  --occpeaks global.occpeaks.bed.gz --nucpos merged.nucpos.bed.gz --out merged
+nucleoatac nfr    --bed peaks.bed --bam data.bam --fasta genome.fa \
+    --occ_track global.occ.bedgraph.gz --calls merged.nucmap_combined.bed.gz --out merged
+```
+
+See [`scripts/run_parallel_nuc.sh`](scripts/run_parallel_nuc.sh) for a ready-to-use script.
+
+**Option B — parallel `occ` + `nuc`** (for large genomes where `occ` is also a bottleneck): run a lightweight global `pyatac sizes`, then run per-chromosome `occ` and `nuc` jobs independently, then `merge_chroms` twice. See the script for details.
+
+### Python 3 port
+
+The codebase has been ported from Python 2.7 to Python 3 (≥3.9). All 15 pipeline outputs agree with the Python 2 reference to within floating-point epsilon:
+![Occupancy parity](profiling/py2_vs_py3/occupancy.png)
+![Signal parity](profiling/py2_vs_py3/signal.png)
+![Nucleosome calls parity](profiling/py2_vs_py3/nucpos.png)
+
+
+## Performance optimizations
+
+Four bottleneck functions were rewritten to replace Python loops with vectorized NumPy:
+
+| Function | Change | Speedup |
+|----------|--------|---------|
+| `calculateOccupancy()` | NumPy broadcast + matmul replaces 101-iteration Python `map` loop | **8.2×** (1.56 ms → 0.19 ms) |
+| `calculateCov()` | O(n²) Cython double-loop → O(n) closed-form (`r·(p·v² − (p·v)²)`) | **8,912×** (234 ms → 0.026 ms) |
+| `makeFragmentMat()` | Vectorized index computation + `np.add.at` replaces per-fragment loop | **2.8×** (6.5 ms → 2.3 ms) |
+| `makeBiasMat()` | Closed-form index slicing replaces 2,000 `np.convolve` calls | **9.5×** (9.9 ms → 1.0 ms) |
+
+**End-to-end on example data (2 cores): 106 s → 30 s (3.5× faster). Peak memory unchanged (232 MB).**
+
+![Per-function and overall speedup](profiling/speedup_comparison.png)
+
+![Memory and runtime comparison](profiling/memory_comparison.png)
+
+All optimizations are numerically equivalent to the original: all outputs pass the full regression test suite at `atol=1e-5`.
+
+
+## Running tests
+
+```bash
+python -m pytest tests/ -v                                  # full suite (~30s)
+python -m pytest tests/ -v --ignore=tests/test_regression.py  # unit tests only
+python -m pytest tests/test_regression.py::TestPy2Regression -v  # numerical parity
+```
+
+
+## Repository structure
+
+```
+NucleoATAC/
+├── nucleoatac/          # Occupancy + nucleosome calling pipeline
+├── pyatac/              # General ATAC-seq utilities
+├── bin/                 # CLI entry points (nucleoatac, pyatac)
+├── scripts/             # Helper shell scripts
+├── tests/               # Test suite
+│   ├── py2_reference/   # Frozen Python 2.7 outputs for regression testing
+│   └── test_*.py        # Unit + regression tests
+└── example/             # Example yeast (sacCer3) dataset
+```
+
+
+## Citation
+
+If you use NucleoATAC, please cite the original paper:
+
+> Schep AN, Buenrostro JD, Denny SK, Bhargava V, Sherlock G, Greenleaf WJ. *Structured nucleosome fingerprints enable high-resolution mapping of chromatin architecture within regulatory regions.* Genome Res. 2015 Nov;25(11):1757-70.

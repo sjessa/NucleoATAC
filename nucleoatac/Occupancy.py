@@ -50,7 +50,7 @@ class FragmentMixDistribution:
             res[nz] = a * x_mod[nz]**(k-1) * np.exp(-x_mod[nz]/theta) / (theta **k * gamma(k))
             return res 
         
-        res_score = np.ones(boundaries[0]+1)*np.float('inf')
+        res_score = np.ones(boundaries[0]+1)*float('inf')
         res_param = [0 for i in range(boundaries[0]+1)]
         pranges = ((0.01,10),(0.01,150),(0.01,1))
 
@@ -65,14 +65,16 @@ class FragmentMixDistribution:
         res = res_param[whichres]
         self.nfr_fit0 = FragmentSizes(self.lower,self.upper, vals = gamma_fit(np.arange(self.lower,self.upper),whichres,res_param[whichres]))
         nfr = np.concatenate((self.fragmentsizes.get(self.lower,boundaries[1]), self.nfr_fit0.get(boundaries[1],self.upper))) 
-        nfr[nfr==0] = min(nfr[nfr!=0])*0.01
+        nonzero_nfr = nfr[nfr != 0]
+        nfr[nfr == 0] = (min(nonzero_nfr) * 0.01) if len(nonzero_nfr) > 0 else 1e-10
         self.nfr_fit = FragmentSizes(self.lower,self.upper, vals = nfr)
 
         nuc = np.concatenate((np.zeros(boundaries[1]-self.lower),
                             self.fragmentsizes.get(boundaries[1],self.upper) -
                             self.nfr_fit.get(boundaries[1],self.upper)))
-        
-        nuc[nuc<=0]=min(min(nfr)*0.1,min(nuc[nuc>0])*0.001)
+        pos_nuc = nuc[nuc > 0]
+        floor = min(min(nfr) * 0.1, min(pos_nuc) * 0.001) if len(pos_nuc) > 0 else min(nfr) * 0.1
+        nuc[nuc <= 0] = floor
         self.nuc_fit = FragmentSizes(self.lower, self.upper, vals = nuc)
 
     def plotFits(self,filename=None):
@@ -105,13 +107,12 @@ class OccupancyCalcParams:
     def __init__(self, lower, upper , insert_dist, ci = 0.9):
         self.lower = lower
         self.upper = upper
-        #self.smooth_mat = np.tile(signal.gaussian(151,25),(upper-lower,1))
         nuc_probs = insert_dist.nuc_fit.get(lower,upper)
         self.nuc_probs = nuc_probs /np.sum(nuc_probs)
         nfr_probs = insert_dist.nfr_fit.get(lower,upper)
         self.nfr_probs = nfr_probs /np.sum(nfr_probs)
         self.alphas = np.linspace(0, 1, 101)
-        #self.x = map(lambda alpha: np.log(alpha * self.nuc_probs + (1 - alpha) * self.nfr_probs), self.alphas)
+        self.alphas_col = self.alphas[:, np.newaxis]  # (101, 1) for broadcasting
         self.l = len(self.alphas)
         self.cutoff = stats.chi2.ppf(ci,1)
 
@@ -123,14 +124,19 @@ def calculateOccupancy(inserts, bias, params):
     nuc_probs = nuc_probs / np.sum(nuc_probs)
     nfr_probs = params.nfr_probs * bias
     nfr_probs = nfr_probs / np.sum(nfr_probs)
-    x = map(lambda alpha: np.log(alpha * nuc_probs + (1 - alpha) * nfr_probs), params.alphas)
-    logliks = np.array(map(lambda j: np.sum(x[j]*inserts),range(params.l)))
+    mixed = params.alphas_col * nuc_probs + (1 - params.alphas_col) * nfr_probs
+    logliks = np.log(mixed) @ inserts
     logliks[np.isnan(logliks)] = -float('inf')
     occ = params.alphas[np.argmax(logliks)]
     #Compute upper and lower bounds for 95% confidence interval
     ratios = 2*(max(logliks)-logliks)
-    lower = params.alphas[min(np.where(ratios < params.cutoff)[0])]
-    upper = params.alphas[max(np.where(ratios < params.cutoff)[0])]
+    ci_idx = np.where(ratios < params.cutoff)[0]
+    if len(ci_idx) == 0:
+        lower = params.alphas[0]
+        upper = params.alphas[-1]
+    else:
+        lower = params.alphas[ci_idx[0]]
+        upper = params.alphas[ci_idx[-1]]
     return occ, lower, upper
 
 
@@ -145,11 +151,11 @@ class OccupancyTrack(Track):
         """Calculate Occupancy track"""
         offset=self.start - mat.start
         if offset<params.flank:
-            raise Exception("For calculateOccupancyMLE, mat does not have sufficient flanking regions"),offset
+            raise Exception(f"For calculateOccupancyMLE, mat does not have sufficient flanking regions: offset={offset}")
         self.vals=np.ones(self.end - self.start)*float('nan')
         self.lower_bound = np.ones(self.end - self.start)*float('nan')
         self.upper_bound =np.ones(self.end - self.start)*float('nan')
-        for i in xrange(params.halfstep,len(self.vals),params.step):
+        for i in range(params.halfstep,len(self.vals),params.step):
             new_inserts = np.sum(mat.get(lower = 0, upper = params.upper,
                                          start = self.start+i-params.flank, end = self.start+i+params.flank+1),
                                          axis = 1)
@@ -212,24 +218,24 @@ class OccupancyParameters:
         if step%2 == 0:
             step = step - 1
         self.step = step
-        self.halfstep = (self.step-1) / 2
+        self.halfstep = (self.step-1) // 2
 
 
     def print_parameters(self):
         """Prints the parameters of the OccupancyParameters class."""
-        print "OccupancyParameters:"
-        print "  sep: %d" % self.sep
-        print "  fasta: %s" % self.fasta
-        print "  pwm file: %s" % self.pwm
-        print "  window size: %d" % self.window
-        print "  min_occ: %f" % self.min_occ
-        print "  flank: %d" % self.flank
-        print "  input_file: %s" % self.input_file
-        print "  input_type: %s" % self.input_type
-        print "  upper: %d" % self.upper
-        print "  occ_calc_params: %s" % str(self.occ_calc_params)
-        print "  step: %d" % self.step
-        print "  halfstep: %d" % self.halfstep
+        print("OccupancyParameters:")
+        print("  sep: %d" % self.sep)
+        print("  fasta: %s" % self.fasta)
+        print("  pwm file: %s" % self.pwm)
+        print("  window size: %d" % self.window)
+        print("  min_occ: %f" % self.min_occ)
+        print("  flank: %d" % self.flank)
+        print("  input_file: %s" % self.input_file)
+        print("  input_type: %s" % self.input_type)
+        print("  upper: %d" % self.upper)
+        print("  occ_calc_params: %s" % str(self.occ_calc_params))
+        print("  step: %d" % self.step)
+        print("  halfstep: %d" % self.halfstep)
 
 class OccChunk(Chunk):
     """Class for calculating occupancy and occupancy peaks
@@ -252,8 +258,8 @@ class OccChunk(Chunk):
         self.bias_mat = BiasMat2D(self.chrom, self.start - self.params.flank,
                                  self.end + self.params.flank, 0, self.params.upper)
         if self.params.fasta is not None:
-            bias_track = InsertionBiasTrack(self.chrom, self.start - self.params.window - self.params.upper/2,
-                                  self.end + self.params.window + self.params.upper/2 + 1, log = True)
+            bias_track = InsertionBiasTrack(self.chrom, self.start - self.params.window - self.params.upper//2,
+                                  self.end + self.params.window + self.params.upper//2 + 1, log = True)
             bias_track.computeBias(self.params.fasta, self.params.chrs, self.params.pwm)
             self.bias_mat.makeBiasMat(bias_track)
 
@@ -297,7 +303,7 @@ class OccChunk(Chunk):
 
     def removeData(self):
         """remove data from chunk-- deletes all attributes"""
-        names = self.__dict__.keys()
+        names = list(self.__dict__.keys())
         for name in names:
             delattr(self, name)
 
