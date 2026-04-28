@@ -4,7 +4,6 @@
 
 > Schep et al. (2015) *Structured nucleosome fingerprints enable high-resolution mapping of chromatin architecture within regulatory regions.* Genome Research. [doi:10.1101/gr.192294.115](http://genome.cshlp.org/content/25/11/1757)
 
----
 
 ## Method overview
 
@@ -27,9 +26,10 @@ occ → vprocess → nuc → merge → nfr
 **Inputs:** ATAC-seq alignment (BAM or tabix-indexed BED fragments), peak regions (BED), reference genome (FASTA).
 **Outputs:** Occupancy track, nucleosome signal track, nucleosome position calls, NFR calls — all as gzipped, tabix-indexed bedgraph/BED files.
 
----
 
 ## Installation
+
+Clone the repository, and then:
 
 ```bash
 conda create -n nucleoatac python=3.12
@@ -44,7 +44,6 @@ nucleoatac --version
 pyatac --version
 ```
 
----
 
 ## Quick start
 
@@ -70,7 +69,6 @@ nucleoatac nfr      --bed peaks.bed --bam data.bam --fasta genome.fa \
                     --occ_track sample.occ.bedgraph.gz --calls sample.nucmap_combined.bed.gz --out sample
 ```
 
----
 
 ## New features in this fork
 
@@ -120,21 +118,11 @@ See [`scripts/run_parallel_nuc.sh`](scripts/run_parallel_nuc.sh) for a ready-to-
 
 ### Python 3 port
 
-The codebase has been fully ported from Python 2.7 to Python 3 (≥3.9). All 15 pipeline outputs agree with the Python 2 reference to within floating-point epsilon:
-
-| Output | Pearson r | Max |Δ| |
-|--------|-----------|---------|
-| Occupancy track (40,217 positions) | 1.000000 | 3.3 × 10⁻¹⁶ |
-| NucleoATAC signal (40,573 positions) | 1.000000 | 1.7 × 10⁻¹³ |
-| Nucleosome calls (130 peaks) | 1.000000 | — (identical positions) |
-| Fragment size distribution | — | 0 (bit-identical) |
-| Nucleosomal insert distribution | — | 4.4 × 10⁻¹⁶ |
-
+The codebase has been ported from Python 2.7 to Python 3 (≥3.9). All 15 pipeline outputs agree with the Python 2 reference to within floating-point epsilon:
 ![Occupancy parity](profiling/py2_vs_py3/occupancy.png)
 ![Signal parity](profiling/py2_vs_py3/signal.png)
 ![Nucleosome calls parity](profiling/py2_vs_py3/nucpos.png)
 
----
 
 ## Performance optimizations
 
@@ -155,7 +143,6 @@ Four bottleneck functions were rewritten to replace Python loops with vectorized
 
 All optimizations are numerically equivalent to the original: all outputs pass the full regression test suite at `atol=1e-5`.
 
----
 
 ## Running tests
 
@@ -165,7 +152,6 @@ python -m pytest tests/ -v --ignore=tests/test_regression.py  # unit tests only
 python -m pytest tests/test_regression.py::TestPy2Regression -v  # numerical parity
 ```
 
----
 
 ## Repository structure
 
@@ -181,7 +167,6 @@ NucleoATAC/
 └── example/             # Example yeast (sacCer3) dataset
 ```
 
----
 
 ## Citation
 
