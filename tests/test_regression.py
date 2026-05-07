@@ -462,7 +462,46 @@ class TestParallelNucConsistency(TestCase):
                 args = parser.parse_args(cmd.split()[1:])
                 nucleoatac_main(args)
 
-            # Merge per-chromosome nuc outputs.
+            # Produce the chrom-restricted reference first: one occ run over
+            # both PARALLEL_CHROMS. Its fragmentsizes.txt is also reused as the
+            # shared --sizes input for per-chrom occ runs below, mirroring the
+            # recommended parallel workflow (README Option B). With a shared
+            # fragment-size model, peak calls line up across runs and merged
+            # nuc_dist matches the combined run exactly.
+            ref_out = os.path.join(PY3_PARALLEL_OUT, "genomewide_restricted")
+            cmd = (
+                f"nucleoatac occ "
+                f"--bed example/example.bed "
+                f"--bam example/example.bam "
+                f"--fasta example/sacCer3.fa "
+                f"--chroms_keep {','.join(PARALLEL_CHROMS)} "
+                f"--out {ref_out} "
+                f"--cores 2"
+            )
+            args = parser.parse_args(cmd.split()[1:])
+            nucleoatac_main(args)
+            ref_sizes = ref_out + ".fragmentsizes.txt"
+
+            # Run occ per chromosome with the shared --sizes input from the
+            # reference. Per-chrom fragmentsizes.txt files are byte-identical
+            # copies of ref_sizes; per-chrom nuc_dist.txt sums to the combined
+            # reference because peak calls match.
+            for chrom in PARALLEL_CHROMS:
+                chrom_out = os.path.join(PY3_PARALLEL_OUT, f"example.{chrom}")
+                cmd = (
+                    f"nucleoatac occ "
+                    f"--bed example/example.bed "
+                    f"--bam example/example.bam "
+                    f"--fasta example/sacCer3.fa "
+                    f"--sizes {ref_sizes} "
+                    f"--chroms_keep {chrom} "
+                    f"--out {chrom_out} "
+                    f"--cores 2"
+                )
+                args = parser.parse_args(cmd.split()[1:])
+                nucleoatac_main(args)
+
+            # Merge per-chromosome nuc + occ outputs.
             merged_out = os.path.join(PY3_PARALLEL_OUT, "merged")
             merge_cmd = (
                 f"nucleoatac merge_chroms "
@@ -540,3 +579,97 @@ class TestParallelNucConsistency(TestCase):
             test_arr = np.array(test[key][0])
             assert_arrays_close(ref_arr, test_arr, ATOL_NUCPOS,
                                 f"parallel nucpos.redundant at {key}")
+
+    def test_parallel_nuc_dist(self):
+        # Per-chrom occ runs share the reference's fragmentsizes via --sizes,
+        # so peak calls match the combined-occ reference and merged nuc_dist
+        # is bit-equivalent to it (modulo FP summation order).
+        ref_lo, ref_up, ref_vals = parse_distribution_txt(
+            self._merged("genomewide_restricted.nuc_dist.txt"))
+        test_lo, test_up, test_vals = parse_distribution_txt(
+            self._merged("merged.nuc_dist.txt"))
+        self.assertEqual((ref_lo, ref_up), (test_lo, test_up),
+            "nuc_dist: lower/upper bounds mismatch")
+        assert_arrays_close(ref_vals, test_vals, ATOL, "parallel nuc_dist")
+
+    def test_parallel_fragmentsizes(self):
+        # With shared --sizes, per-chrom fragmentsizes.txt files are
+        # byte-identical copies of the reference; the merge's auto-detect
+        # copies the first one through unchanged.
+        ref_lo, ref_up, ref_vals = parse_distribution_txt(
+            self._merged("genomewide_restricted.fragmentsizes.txt"))
+        test_lo, test_up, test_vals = parse_distribution_txt(
+            self._merged("merged.fragmentsizes.txt"))
+        self.assertEqual((ref_lo, ref_up), (test_lo, test_up),
+            "fragmentsizes: lower/upper bounds mismatch")
+        assert_arrays_close(ref_vals, test_vals, ATOL, "parallel fragmentsizes")
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for merge helpers — directly exercise the #raw_counts code path
+# (not exercised by TestParallelNucConsistency, which uses the shared --sizes
+# workflow where per-chrom files lack #raw_counts).
+# ---------------------------------------------------------------------------
+
+class TestMergeFragmentSizesUnit(TestCase):
+    """Unit tests for nucleoatac.merge._merge_fragmentsizes."""
+
+    def _write_synthetic(self, path, lower, upper, raw):
+        from pyatac.fragmentsizes import FragmentSizes
+        obj = FragmentSizes(lower, upper)
+        raw = np.asarray(raw, dtype=np.int64)
+        obj.raw = raw
+        total = raw.sum()
+        obj.vals = raw / (total + (total == 0))
+        obj.save(path)
+
+    def test_raw_counts_path_sums_and_renormalises(self):
+        from nucleoatac.merge import _merge_fragmentsizes
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            f1 = os.path.join(tmp, "a.fragmentsizes.txt")
+            f2 = os.path.join(tmp, "b.fragmentsizes.txt")
+            out = os.path.join(tmp, "merged.fragmentsizes.txt")
+            self._write_synthetic(f1, 0, 5, [10, 20, 30, 40, 50])
+            self._write_synthetic(f2, 0, 5, [1, 2, 3, 4, 5])
+            _merge_fragmentsizes([f1, f2], out)
+            lo, up, vals = parse_distribution_txt(out)
+            self.assertEqual((lo, up), (0, 5))
+            expected_raw = np.array([11, 22, 33, 44, 55], dtype=np.int64)
+            expected_vals = expected_raw / expected_raw.sum()
+            assert_arrays_close(expected_vals, vals, 1e-12, "raw-counts merge")
+
+    def test_identical_no_raw_path_copies_first(self):
+        from nucleoatac.merge import _merge_fragmentsizes
+        from pyatac.fragmentsizes import FragmentSizes
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            f1 = os.path.join(tmp, "a.fragmentsizes.txt")
+            f2 = os.path.join(tmp, "b.fragmentsizes.txt")
+            out = os.path.join(tmp, "merged.fragmentsizes.txt")
+            shared = FragmentSizes(0, 5, vals=np.array([0.1, 0.2, 0.3, 0.2, 0.2]))
+            shared.save(f1)
+            shared.save(f2)
+            _merge_fragmentsizes([f1, f2], out)
+            lo, up, vals = parse_distribution_txt(out)
+            self.assertEqual((lo, up), (0, 5))
+            assert_arrays_close(shared.vals, vals, 1e-12, "shared --sizes copy")
+
+    def test_mixed_or_pathological_raises(self):
+        from nucleoatac.merge import _merge_fragmentsizes
+        from pyatac.fragmentsizes import FragmentSizes
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            f1 = os.path.join(tmp, "a.fragmentsizes.txt")
+            f2 = os.path.join(tmp, "b.fragmentsizes.txt")
+            out = os.path.join(tmp, "merged.fragmentsizes.txt")
+            # Mixed: one file has raw counts, the other doesn't.
+            self._write_synthetic(f1, 0, 5, [1, 2, 3, 4, 5])
+            FragmentSizes(0, 5, vals=np.array([0.1, 0.2, 0.3, 0.2, 0.2])).save(f2)
+            with self.assertRaises(RuntimeError):
+                _merge_fragmentsizes([f1, f2], out)
+            # Differing without raw counts (would be wrong to merge naively).
+            FragmentSizes(0, 5, vals=np.array([0.5, 0.1, 0.2, 0.1, 0.1])).save(f1)
+            FragmentSizes(0, 5, vals=np.array([0.1, 0.2, 0.3, 0.2, 0.2])).save(f2)
+            with self.assertRaises(RuntimeError):
+                _merge_fragmentsizes([f1, f2], out)

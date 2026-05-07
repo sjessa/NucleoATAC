@@ -8,7 +8,9 @@ Script to merge nuc positions
 
 from pyatac.utils import shell_command, save_params_json
 from pyatac.chunk import Chunk, ChunkList
+from pyatac.fragmentsizes import FragmentSizes
 import gzip
+import numpy as np
 import pysam
 import os
 
@@ -88,6 +90,75 @@ def merge(occ_peaks, nuc_calls, sep = 120):
         i += 1
     return keep
 
+def _merge_fragmentsizes(chrom_files, out_file):
+    """Merge per-chromosome fragmentsizes.txt files.
+
+    Two valid workflows are auto-detected:
+
+    1. All per-chrom occ runs computed independent fragment-size distributions
+       (no --sizes). Each file carries a #raw_counts vector; we sum the raw
+       counts and renormalise. Result equals a combined-occ run on the same
+       chroms only if peak calls happen to line up; in general nuc_dist may
+       drift from a combined-occ run because each per-chrom occ used a
+       chrom-specific NFR fit.
+
+    2. All per-chrom occ runs shared a global --sizes input (recommended
+       parallel workflow). No file has #raw_counts, and all files are
+       byte-identical copies of the input. We copy the first one through.
+       This is the only configuration where merged nuc_dist matches a
+       combined-occ run exactly.
+
+    Any other combination (mixed presence, or files without #raw_counts that
+    differ) is pathological and raises.
+    """
+    objs = [FragmentSizes.open(f) for f in chrom_files]
+    lower, upper = objs[0].lower, objs[0].upper
+    for f, o in zip(chrom_files, objs):
+        assert (o.lower, o.upper) == (lower, upper), (
+            f"FragmentSizes bound mismatch in {f}: "
+            f"{o.lower}-{o.upper} vs {lower}-{upper}")
+    have_raw = [o.raw is not None for o in objs]
+    if all(have_raw):
+        total_raw = np.sum([o.raw for o in objs], axis=0).astype(np.int64)
+        total = total_raw.sum()
+        merged = FragmentSizes(lower, upper)
+        merged.raw = total_raw
+        merged.vals = total_raw / (total + (total == 0))
+        merged.save(out_file)
+    elif not any(have_raw) and all(np.allclose(o.vals, objs[0].vals, atol=0, rtol=0)
+                                   for o in objs[1:]):
+        import shutil
+        shutil.copy2(chrom_files[0], out_file)
+    else:
+        partial = [f for f, h in zip(chrom_files, have_raw) if not h]
+        raise RuntimeError(
+            "Cannot merge fragmentsizes.txt: per-chrom files are inconsistent. "
+            "Either all files must carry the #raw_counts section "
+            "(independent per-chrom occ, no --sizes), or all must lack it AND "
+            "be byte-identical (per-chrom occ runs with a shared --sizes "
+            "input). Files lacking #raw_counts:\n  "
+            + "\n  ".join(partial) +
+            "\nThis typically indicates a mix of workflows or files generated "
+            "by an older NucleoATAC version. Re-run per-chrom occ uniformly "
+            "(see the parallelization section of the README).")
+
+
+def _merge_nuc_dist(chrom_files, out_file):
+    """Merge per-chromosome nuc_dist.txt files by summing element-wise.
+    Each per-chrom file is itself an unnormalised sum of per-peak normalised
+    distributions, so chromosome-level summation reproduces the genome-wide
+    file exactly."""
+    objs = [FragmentSizes.open(f) for f in chrom_files]
+    lower, upper = objs[0].lower, objs[0].upper
+    for f, o in zip(chrom_files, objs):
+        assert (o.lower, o.upper) == (lower, upper), (
+            f"FragmentSizes bound mismatch in {f}: "
+            f"{o.lower}-{o.upper} vs {lower}-{upper}")
+    summed = np.sum([o.vals for o in objs], axis=0)
+    out = FragmentSizes(lower, upper, vals=summed)
+    out.save(out_file)
+
+
 def run_merge_chroms(args):
     """Merge per-chromosome NucleoATAC output files.
 
@@ -143,12 +214,12 @@ def run_merge_chroms(args):
             os.remove(uncompressed)
             pysam.tabix_index(out_file, preset="bed", force=True)
             print(f"  merged {len(chrom_files)} files -> {out_file}")
-        else:
-            # Plain text files (fragmentsizes, nuc_dist): just use first chrom's version
-            # since these are genome-wide summaries, not per-chrom
-            import shutil
-            shutil.copy2(chrom_files[0], out_file)
-            print(f"  copied {chrom_files[0]} -> {out_file}")
+        elif suffix == 'fragmentsizes.txt':
+            _merge_fragmentsizes(chrom_files, out_file)
+            print(f"  merged {len(chrom_files)} files -> {out_file}")
+        elif suffix == 'nuc_dist.txt':
+            _merge_nuc_dist(chrom_files, out_file)
+            print(f"  merged {len(chrom_files)} files -> {out_file}")
 
     # Copy PDF files if they exist (from first chrom)
     for suffix in ['fragmentsizes.pdf', 'occ_fit.pdf', 'nuc_dist.pdf']:

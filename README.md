@@ -114,7 +114,43 @@ nucleoatac nfr    --bed peaks.bed --bam data.bam --fasta genome.fa \
 
 See [`scripts/run_parallel_nuc.sh`](scripts/run_parallel_nuc.sh) for a ready-to-use script.
 
-**Option B — parallel `occ` + `nuc`** (for large genomes where `occ` is also a bottleneck): run a lightweight global `pyatac sizes`, then run per-chromosome `occ` and `nuc` jobs independently, then `merge_chroms` twice. See the script for details.
+**Option B — parallel `occ` + `nuc`** (for large genomes where `occ` is also a bottleneck):
+
+```bash
+# Phase 1: compute the global fragment-size distribution once.
+pyatac sizes --bam data.bam --bed peaks.bed --out global
+
+# Phase 2: per-chromosome occ. The shared --sizes is REQUIRED for correctness:
+# without it, each per-chrom occ fits its own NFR model and a few peaks near
+# the min_occ threshold flip in/out, so merged nuc_dist drifts from a
+# combined-occ run. With --sizes shared, peak calls match exactly.
+for chrom in chr1 chr2 ...; do
+  nucleoatac occ --bed peaks.bed --bam data.bam --fasta genome.fa \
+    --sizes      global.fragmentsizes.txt \
+    --chroms_keep $chrom \
+    --out per_chrom/$chrom --cores 4 &
+done; wait
+
+# Phase 3: per-chromosome nuc (uses outputs from per-chrom occ above).
+for chrom in chr1 chr2 ...; do
+  nucleoatac nuc --bed peaks.bed --bam data.bam --fasta genome.fa \
+    --sizes      global.fragmentsizes.txt \
+    --vmat       per_chrom/$chrom.VMat \
+    --occ_track  per_chrom/$chrom.occ.bedgraph.gz \
+    --chroms_keep $chrom \
+    --out per_chrom/$chrom --cores 4 &
+done; wait
+
+# Phase 4: merge + downstream.
+nucleoatac merge_chroms --prefix per_chrom/ --chroms chr1,chr2,... --out merged
+```
+
+`merge_chroms` auto-detects which workflow produced the per-chrom outputs:
+- All per-chrom `fragmentsizes.txt` are byte-identical (shared `--sizes`): copies the first through.
+- All carry `#raw_counts` (no `--sizes`, each occ computed its own distribution): sums the raw counts and renormalises.
+- Mixed or differing without `#raw_counts`: raises (re-run uniformly).
+
+If you skip `--sizes` in Phase 2, the merge of `nuc_dist.txt` is still mathematically correct (sum of per-chrom files), but it will not bit-match a combined-occ run because each per-chrom occ has called slightly different peaks.
 
 ### Python 3 port
 

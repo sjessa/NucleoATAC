@@ -20,6 +20,7 @@ class FragmentSizes:
         self.upper = upper
         self.vals = vals
         self.atac = atac
+        self.raw = None
 
     def calculateSizes(self, input_file, input_type = "bam", chunks = None):
         """Calculate fragment size distribution from a BAM file or fragments file"""
@@ -33,7 +34,8 @@ class FragmentSizes:
                 sizes = getAllFragmentSizesFromFragsFile(input_file, self.lower, self.upper)
             else:
                 sizes = getAllFragmentSizesFromFragsFileFromChunkList(chunks, input_file, self.lower, self.upper)
-            
+
+        self.raw = np.asarray(sizes).astype(np.int64)
         self.vals = sizes / (np.sum(sizes) + (np.sum(sizes)==0))
 
     def get(self, lower = None, upper = None, size = None):
@@ -63,11 +65,15 @@ class FragmentSizes:
             f.write(str(self.upper)+"\n")
             f.write("#sizes\n")
             f.write("\t".join(map(str,self.get()))+"\n")
+            if self.raw is not None:
+                f.write("#raw_counts\n")
+                f.write("\t".join(map(str, self.raw.astype(np.int64).tolist()))+"\n")
 
     @staticmethod
     def open(filename):
         """Create FragmentDistribution object from text descriptor file"""
         state = ''
+        raw_counts = None
         with open(filename,'r') as infile:
             for line in infile:
                 if '#lower' in line:
@@ -76,6 +82,8 @@ class FragmentSizes:
                     state = 'upper'
                 elif '#sizes' in line:
                     state = 'sizes'
+                elif '#raw_counts' in line:
+                    state = 'raw_counts'
                 elif '#' in line:
                     state = 'other'
                 elif state == 'lower':
@@ -84,11 +92,14 @@ class FragmentSizes:
                     upper = int(line.strip('\n'))
                 elif state == 'sizes':
                     fragmentsizes = np.array(list(map(float,line.rstrip("\n").split("\t"))))
+                elif state == 'raw_counts':
+                    raw_counts = np.array(list(map(int, line.rstrip("\n").split("\t"))), dtype=np.int64)
         try:
             new = FragmentSizes(lower, upper, vals = fragmentsizes)
         except NameError:
             raise Exception("FragmentDistribution decriptor file appeas to be missing some\
 needed components")
+        new.raw = raw_counts
         return new
 
 
