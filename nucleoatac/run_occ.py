@@ -82,6 +82,7 @@ def run_occ(args):
     # to not use the BAM file.
     chrs = read_chrom_sizes_from_fasta(args.fasta)
 
+    # load the Tn5 bias
     pwm = PWM.open(args.pwm)
 
     # modified to optionally keep only certain chromosomes
@@ -188,7 +189,8 @@ def run_occ(args):
 
     # NOTE: _occHlper takes a tuple as input, containing the chunk and the parameters.
     # This is the part that actually executes the occupancy calling. It doesn't need
-    # to be modified directly, but calls occ.process in nucleoatac.Occupancy.OccChunk.process which we have modified slightly.
+    # to be modified directly, but calls occ.process in nucleoatac.Occupancy.OccChunk.process
+    # which we have modified slightly.
     for j in sets:
         tmp = pool1.map(_occHelper, zip(j,itertools.repeat(params)))
         for result in tmp:

@@ -244,11 +244,20 @@ def run_merge(args):
         "sep": args.sep,
         "min_occ": args.min_occ,
     })
-    with open(args.out + '.nucmap_combined.bed','w') as out:
+    bed_path = args.out + '.nucmap_combined.bed'
+    with open(bed_path, 'w') as out:
         out.write(new.asBed())
-    pysam.tabix_compress(args.out + '.nucmap_combined.bed', args.out + '.nucmap_combined.bed.gz',force = True)
-    os.remove(args.out + '.nucmap_combined.bed')
-    pysam.tabix_index(args.out + '.nucmap_combined.bed.gz', preset = "bed", force = True)
+    # Sort by (chrom, start) so tabix can index — required when occpeaks/nucpos
+    # come from `merge_chroms` of per-chromosome shards, which can produce
+    # non-contiguous chromosome blocks.
+    with open(bed_path) as f:
+        lines = [ln for ln in f if ln.strip()]
+    lines.sort(key=lambda ln: (ln.split('\t', 2)[0], int(ln.split('\t', 2)[1])))
+    with open(bed_path, 'w') as f:
+        f.writelines(lines)
+    pysam.tabix_compress(bed_path, bed_path + '.gz', force=True)
+    os.remove(bed_path)
+    pysam.tabix_index(bed_path + '.gz', preset="bed", force=True)
  
 
 
